@@ -16,9 +16,9 @@ function getTrumpFullName(trump: string): string {
 }
 
 // Helper to calculate final round number
-// Final round = (52 / numberOfPlayers) * 2 (integer division)
+// Final round = (6 / numberOfPlayers) * 2 (integer division)
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(52 / numPlayers) * 2;
+    return Math.floor(6 / numPlayers) * 2;
 }
 
 export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: { gameId: string, gameState: any, isOperator: boolean, onGameUpdate?: (game: any) => void }) {

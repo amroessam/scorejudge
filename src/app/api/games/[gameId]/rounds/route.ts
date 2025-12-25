@@ -6,8 +6,8 @@ import { google } from "googleapis";
 
 // Helper to calc round plan
 function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
-    // 52 cards
-    const maxCards = Math.floor(52 / numPlayers);
+    // 6 cards
+    const maxCards = Math.floor(6 / numPlayers);
     const rounds: { cards: number, trump: string }[] = [];
     const TRUMPS = ['S', 'D', 'C', 'H', 'NT'];
 
@@ -21,9 +21,9 @@ function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
 }
 
 // Helper to calculate final round number
-// Final round = (52 / numberOfPlayers) * 2 (integer division)
+// Final round = (6 / numberOfPlayers) * 2 (integer division)
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(52 / numPlayers) * 2;
+    return Math.floor(6 / numPlayers) * 2;
 }
 
 // Helper to get dealer index for a round

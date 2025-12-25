@@ -50,7 +50,7 @@ function getTrumpIcon(trump: string) {
 
 // Helper to calculate final round number
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(52 / numPlayers) * 2;
+    return Math.floor(6 / numPlayers) * 2;
 }
 
 export function Scoreboard({ 

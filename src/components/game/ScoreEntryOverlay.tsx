@@ -15,7 +15,7 @@ interface ScoreEntryOverlayProps {
 
 // Helper to calculate final round number
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(52 / numPlayers) * 2;
+    return Math.floor(6 / numPlayers) * 2;
 }
 
 export function ScoreEntryOverlay({ 
@@ -28,6 +28,9 @@ export function ScoreEntryOverlay({
     const { players, currentRoundIndex, rounds, firstDealerEmail } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
     
+    // Lock the type when overlay opens to prevent it from changing during exit animation
+    const lockedTypeRef = useRef<'BIDS' | 'TRICKS' | null>(null);
+    
     // Check if game ended
     const finalRoundNumber = getFinalRoundNumber(players.length);
     const completedRounds = rounds.filter((r: any) => r.state === 'COMPLETED');
@@ -36,9 +39,32 @@ export function ScoreEntryOverlay({
         : 0;
     const isGameEnded = lastCompletedRound >= finalRoundNumber;
     
-    // Determine Entry Type
+    // Determine Entry Type - lock it when overlay opens
     const isBidding = !activeRound || activeRound.state === 'BIDDING';
-    const type = isBidding ? 'BIDS' : 'TRICKS';
+    const currentType = isBidding ? 'BIDS' : 'TRICKS';
+    
+    // Lock type when overlay opens, keep it locked during exit animation
+    useEffect(() => {
+        if (isOpen) {
+            // Lock the type when opening - use the current type at that moment
+            lockedTypeRef.current = currentType;
+        }
+        // Don't clear the lock immediately when closing - let it persist during exit animation
+    }, [isOpen, currentType]);
+    
+    // Clear lock after overlay is fully closed (when isOpen becomes false)
+    useEffect(() => {
+        if (!isOpen && lockedTypeRef.current !== null) {
+            // Clear lock after animation completes
+            const timer = setTimeout(() => {
+                lockedTypeRef.current = null;
+            }, 600); // Slightly longer than animation to be safe
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
+    
+    // Use locked type if available, otherwise use current type
+    const type = lockedTypeRef.current ?? currentType;
     
     // Close overlay if game ended
     useEffect(() => {
@@ -241,8 +267,13 @@ export function ScoreEntryOverlay({
             if (!res.ok) {
                 setError(data.error || "Failed to save");
             } else {
-                if (data.game) onGameUpdate(data.game);
+                // Close overlay first to start exit animation
+                // The locked type will prevent UI from changing during animation
                 onClose();
+                // Update game state after animation completes (spring animation ~500ms)
+                setTimeout(() => {
+                    if (data.game) onGameUpdate(data.game);
+                }, 500);
             }
         } catch (e) {
             setError("Network error");
