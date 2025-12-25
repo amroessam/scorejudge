@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { getGame, setGame, getSheetIdFromTempId } from "@/lib/store";
+
+export async function PATCH(
+    req: NextRequest,
+    { params }: { params: Promise<{ gameId: string }> }
+) {
+    const { gameId } = await params;
+    
+    // Auth check
+    let token;
+    try {
+        token = await getToken({ 
+            req, 
+            secret: process.env.NEXTAUTH_SECRET,
+            cookieName: process.env.NODE_ENV === 'production' 
+                ? '__Secure-next-auth.session-token' 
+                : 'next-auth.session-token'
+        });
+    } catch (e) {
+        console.error('Error getting token:', e);
+        return NextResponse.json({ error: "Authentication error" }, { status: 401 });
+    }
+    
+    if (!token) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get body
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    
+    const { name } = body;
+    if (!name || typeof name !== 'string') {
+        return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+
+    // Resolve game ID
+    let actualGameId = gameId;
+    if (gameId.startsWith('temp_')) {
+        const realSheetId = getSheetIdFromTempId(gameId);
+        if (realSheetId) {
+            actualGameId = realSheetId;
+        }
+    }
+    
+    let game = getGame(actualGameId);
+    if (!game) {
+        game = getGame(gameId); // Try original ID too
+    }
+
+    if (!game) {
+        return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    }
+
+    // Update player
+    const playerIndex = game.players.findIndex(p => p.email === token.email);
+    if (playerIndex === -1) {
+        return NextResponse.json({ error: "Player not found in game" }, { status: 404 });
+    }
+
+    // Update name
+    game.players[playerIndex].name = name;
+    
+    // Save to store
+    setGame(actualGameId, game);
+    if (actualGameId !== gameId) {
+        setGame(gameId, game);
+    }
+
+    // Broadcast update
+    if ((global as any).broadcastGameUpdate) {
+        (global as any).broadcastGameUpdate(gameId, game);
+        if (actualGameId !== gameId) {
+            (global as any).broadcastGameUpdate(actualGameId, game);
+        }
+    }
+
+    // TODO: Update in Google Sheet if we want persistence of name changes
+    // For now, in-memory update is sufficient for live game play
+    // But ideally we'd update the Players sheet too.
+
+    return NextResponse.json({ success: true, game });
+}
+
