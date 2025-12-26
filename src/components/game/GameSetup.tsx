@@ -258,13 +258,34 @@ export function GameSetup({
         if (gameState.players.length < 3) return;
         setStarting(true);
         try {
-            await fetch(`/api/games/${gameId}/rounds`, {
+            const res = await fetch(`/api/games/${gameId}/rounds`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'START' })
             });
-            // WebSocket will handle the redirect/update to play mode
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                alert(data.error || "Failed to start game");
+                setStarting(false);
+                return;
+            }
+            
+            // Update game state with the response
+            if (data.game) {
+                onGameUpdate(data.game);
+            } else {
+                // Fallback: reload game state
+                const reloadRes = await fetch(`/api/games/${gameId}`);
+                if (reloadRes.ok) {
+                    const reloadData = await reloadRes.json();
+                    onGameUpdate(reloadData);
+                }
+            }
+            // Note: The page will automatically switch to PLAYING mode when currentRoundIndex > 0
         } catch (e) {
+            console.error("Error starting game:", e);
             alert("Failed to start game");
             setStarting(false);
         }

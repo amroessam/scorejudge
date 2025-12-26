@@ -83,16 +83,20 @@ export function createGameResourcesInSheetAsync(
             // Update game state with real sheetId
             updateGameState(tempGameId, sheetId);
 
-            // Make Public Writer (MVP Workaround for No-DB) - fire-and-forget
-            drive.permissions.create({
-                fileId: sheetId,
-                requestBody: {
-                    role: 'writer',
-                    type: 'anyone',
-                },
-            }).catch((e: any) => {
-                console.error("Failed to set permissions on sheet (continuing anyway):", e);
-            });
+            // Share sheet with owner (user) as writer - fire-and-forget
+            if (user.email) {
+                drive.permissions.create({
+                    fileId: sheetId,
+                    requestBody: {
+                        role: 'writer',
+                        type: 'user',
+                        emailAddress: user.email,
+                    },
+                    sendNotificationEmail: false,
+                }).catch((e: any) => {
+                    console.error("Failed to share sheet with owner (continuing anyway):", e);
+                });
+            }
 
             // 3. Init Tabs - MUST await this before writing headers
             try {
@@ -202,18 +206,21 @@ export async function createGameResourcesInSheet(auth: any, gameName: string, us
         });
         const sheetId = sheetRes.data.id!;
 
-        // Return sheetId immediately - continue setup asynchronously
-        // Make Public Writer (MVP Workaround for No-DB) - fire-and-forget
-        drive.permissions.create({
-            fileId: sheetId,
-            requestBody: {
-                role: 'writer',
-                type: 'anyone',
-            },
-        }).catch((e: any) => {
-            console.error("Failed to set permissions on sheet (continuing anyway):", e);
-            // Continue - game will work in memory
-        });
+        // Share sheet with owner (user) as writer - fire-and-forget
+        if (user.email) {
+            drive.permissions.create({
+                fileId: sheetId,
+                requestBody: {
+                    role: 'writer',
+                    type: 'user',
+                    emailAddress: user.email,
+                },
+                sendNotificationEmail: false,
+            }).catch((e: any) => {
+                console.error("Failed to share sheet with owner (continuing anyway):", e);
+                // Continue - game will work in memory
+            });
+        }
 
         // 3. Init Tabs (fire-and-forget)
         sheets.spreadsheets.batchUpdate({

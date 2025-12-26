@@ -4,11 +4,17 @@ import { getGoogleFromToken } from "@/lib/google";
 import { fetchGameFromSheet } from "@/lib/game-logic";
 import { setGame, getGame, getSheetIdFromTempId } from "@/lib/store";
 import { google } from "googleapis";
+import { validateCSRF } from "@/lib/csrf";
 
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ gameId: string }> }
 ) {
+    // Validate CSRF protection
+    if (!validateCSRF(req)) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+    }
+
     const { gameId } = await params;
     
     // Try to get token with better error handling
@@ -83,21 +89,73 @@ export async function POST(
         }, { status: 400 });
     }
 
-    // 4. Add to Sheet (if Google Sheets is available and not temp ID)
+    // 4. Add to Sheet and share with player (if Google Sheets is available and not temp ID)
     if (!gameId.startsWith('temp_')) {
         let sheets: any = null;
+        let drive: any = null;
         try {
+            // Use owner's auth to share the sheet and add player
+            // First, get owner's auth token - we need to fetch it from the game owner
+            // For now, try with current user's auth - if they're the owner, it will work
+            // If not, we'll need to handle this differently (store owner's refresh token)
             const auth = getGoogleFromToken(token);
             sheets = google.sheets({ version: 'v4', auth });
+            drive = google.drive({ version: 'v3', auth });
             
-            await sheets.spreadsheets.values.append({
-                spreadsheetId: actualGameId,
-                range: 'Players!A:C',
-                valueInputOption: 'USER_ENTERED',
-                requestBody: {
-                    values: [[token.id, token.name, token.email]]
+            // Try to add player to sheet
+            try {
+                await sheets.spreadsheets.values.append({
+                    spreadsheetId: actualGameId,
+                    range: 'Players!A:C',
+                    valueInputOption: 'USER_ENTERED',
+                    requestBody: {
+                        values: [[token.id, token.name, token.email]]
+                    }
+                });
+            } catch (sheetError: any) {
+                // If we can't write, try to share the sheet with the player first
+                // This might fail if current user is not the owner, but we'll try
+                if (token.email) {
+                    try {
+                        await drive.permissions.create({
+                            fileId: actualGameId,
+                            requestBody: {
+                                role: 'writer',
+                                type: 'user',
+                                emailAddress: token.email,
+                            },
+                            sendNotificationEmail: false,
+                        });
+                        // Retry adding player after sharing
+                        await sheets.spreadsheets.values.append({
+                            spreadsheetId: actualGameId,
+                            range: 'Players!A:C',
+                            valueInputOption: 'USER_ENTERED',
+                            requestBody: {
+                                values: [[token.id, token.name, token.email]]
+                            }
+                        });
+                    } catch (shareError: any) {
+                        console.error("Failed to share sheet with player or add to sheet:", shareError);
+                        // Continue - game will work in memory
+                    }
                 }
-            });
+            }
+            
+            // Share sheet with new player if not already shared (fire-and-forget)
+            if (token.email && token.email !== game.ownerEmail) {
+                drive.permissions.create({
+                    fileId: actualGameId,
+                    requestBody: {
+                        role: 'writer',
+                        type: 'user',
+                        emailAddress: token.email,
+                    },
+                    sendNotificationEmail: false,
+                }).catch((e: any) => {
+                    console.error("Failed to share sheet with new player (continuing anyway):", e);
+                });
+            }
         } catch (e: any) {
             console.error("Failed to add player to sheet (continuing anyway):", e);
             // Continue even if sheet update fails - game will work in memory

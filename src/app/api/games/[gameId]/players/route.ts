@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { getGame, setGame, getSheetIdFromTempId } from "@/lib/store";
+import { validateCSRF } from "@/lib/csrf";
 
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ gameId: string }> }
 ) {
+    // Validate CSRF protection
+    if (!validateCSRF(req)) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+    }
+
     const { gameId } = await params;
     
     // Auth check

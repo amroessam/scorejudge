@@ -2,6 +2,7 @@ import { getGoogleFromToken, listValidationGames, createGameResourcesInSheetAsyn
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import { setGame, type GameState, mapTempIdToSheetId, getSheetIdFromTempId } from "@/lib/store";
+import { validateCSRF } from "@/lib/csrf";
 
 // Using Route Handler for data fetching to keep credentials server-side
 export async function GET(req: NextRequest) {
@@ -22,6 +23,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    // Validate CSRF protection
+    if (!validateCSRF(req)) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+    }
+
     let token;
     try {
         token = await getToken({ 

@@ -4,6 +4,7 @@ import { getGoogleFromToken } from "@/lib/google";
 import { fetchGameFromSheet } from "@/lib/game-logic"; // Ensure this matches file path
 import { setGame, getGame, removeGame, getSheetIdFromTempId, updateGame } from "@/lib/store";
 import { google } from "googleapis";
+import { validateCSRF } from "@/lib/csrf";
 
 export async function GET(
     req: NextRequest,
@@ -69,6 +70,11 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ gameId: string }> }
 ) {
+    // Validate CSRF protection
+    if (!validateCSRF(req)) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+    }
+
     const { gameId } = await params;
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     
@@ -140,6 +146,11 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ gameId: string }> }
 ) {
+    // Validate CSRF protection
+    if (!validateCSRF(req)) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+    }
+
     const { gameId } = await params;
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

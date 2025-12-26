@@ -14,10 +14,10 @@ import { getGame, setGame } from './src/lib/store';
 // Simulated test data
 const testGameId = 'test-game-123';
 const testPlayers = [
-    { id: 'user1', name: 'Player 1', email: 'player1@test.com' },
-    { id: 'user2', name: 'Player 2', email: 'player2@test.com' },
-    { id: 'user3', name: 'Player 3', email: 'player3@test.com' },
-    { id: 'user4', name: 'Player 4', email: 'player4@test.com' },
+    { id: 'user1', name: 'Player 1', email: 'player1@test.com', tricks: 0, bid: 0, score: 0 },
+    { id: 'user2', name: 'Player 2', email: 'player2@test.com', tricks: 0, bid: 0, score: 0 },
+    { id: 'user3', name: 'Player 3', email: 'player3@test.com', tricks: 0, bid: 0, score: 0 },
+    { id: 'user4', name: 'Player 4', email: 'player4@test.com', tricks: 0, bid: 0, score: 0 },
 ];
 
 console.log('=== ScoreJudge Game Flow Test ===\n');
@@ -88,12 +88,13 @@ if (game) {
 // Test 4: Simulate Round 1 bidding
 console.log('4. Testing Round 1 bidding...');
 const round1 = game?.rounds.find(r => r.index === 1);
+let bids: Record<string, number> = {};
 if (round1) {
     console.log(`  Cards per player: ${round1.cards}`);
     console.log(`  Trump: ${round1.trump}`);
     
     // Example bids that sum to cards per player (1)
-    const bids = { 
+    bids = { 
         [testPlayers[0].email]: 1,
         [testPlayers[1].email]: 0,
         [testPlayers[2].email]: 0,

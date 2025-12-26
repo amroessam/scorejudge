@@ -15,7 +15,8 @@ interface ScoreEntryOverlayProps {
 
 // Helper to calculate final round number
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(6 / numPlayers) * 2;
+    const maxCards = Math.floor(52 / numPlayers);
+    return maxCards * 2 - 1;
 }
 
 export function ScoreEntryOverlay({ 
@@ -283,9 +284,9 @@ export function ScoreEntryOverlay({
     };
 
     // Calculate sum dynamically for UI feedback
-    const currentSum = Object.values(inputs).reduce((sum, val) => {
+    const currentSum = Object.values(inputs).reduce((sum: number, val) => {
         if (val === undefined || val === '') return sum;
-        const n = parseInt(val.toString());
+        const n = typeof val === 'string' ? parseInt(val, 10) : Number(val);
         return sum + (isNaN(n) ? 0 : (n === -1 ? 0 : n));
     }, 0);
 

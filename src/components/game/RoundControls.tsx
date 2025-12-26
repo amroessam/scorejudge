@@ -16,9 +16,10 @@ function getTrumpFullName(trump: string): string {
 }
 
 // Helper to calculate final round number
-// Final round = (6 / numberOfPlayers) * 2 (integer division)
+// Final round = (52 / numberOfPlayers) * 2 - 1 (down: maxCards rounds, up: maxCards-1 rounds)
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(6 / numPlayers) * 2;
+    const maxCards = Math.floor(52 / numPlayers);
+    return maxCards * 2 - 1;
 }
 
 export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: { gameId: string, gameState: any, isOperator: boolean, onGameUpdate?: (game: any) => void }) {
@@ -47,7 +48,7 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
     // If active round state is BIDDING -> Show inputs for Bids
     // If active round state is PLAYING -> Show inputs for Tricks (and read-only Bids)
 
-    const [inputs, setInputs] = useState<Record<string, number>>({});
+    const [inputs, setInputs] = useState<Record<string, number | string>>({});
 
     // Helper to get dealer index for a round
     const getDealerIndex = (roundIndex: number, numPlayers: number): number => {
@@ -86,10 +87,13 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
             const bids = biddingOrder.map((p: any) => {
                 const bid = inputs[p.email];
                 // If bid is undefined, null, or empty string, treat as 0
-                if (bid === undefined || bid === null || bid === '') {
+                if (bid === undefined || bid === null) {
                     return 0;
                 }
-                const numBid = typeof bid === 'string' ? parseInt(bid) : bid;
+                if (typeof bid === 'string' && (bid === '' || bid.trim() === '')) {
+                    return 0;
+                }
+                const numBid = typeof bid === 'string' ? parseInt(bid, 10) : Number(bid);
                 if (isNaN(numBid) || numBid < 0) {
                     return null;
                 }
@@ -101,7 +105,9 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
             });
 
             // Check for validation errors
-            const invalidBid = bids.find((b: any) => b && typeof b === 'object' && b.error);
+            const invalidBid = bids.find((b: any): b is { error: true; player: string; bid: number } => 
+                b !== null && typeof b === 'object' && 'error' in b && b.error === true
+            );
             if (invalidBid) {
                 alert(`${invalidBid.player} cannot bid ${invalidBid.bid}. Maximum bid is ${cardsPerPlayer} (cards dealt per player).`);
                 return;
@@ -113,7 +119,9 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
             }
 
             // Validate dealer constraint: sum of bids must NOT equal cards per player
-            const sumBids = bids.reduce((sum: number, b: number) => sum + b, 0);
+            // Filter out nulls and error objects, then sum
+            const validBids = bids.filter((b: any): b is number => typeof b === 'number');
+            const sumBids = validBids.reduce((sum: number, b: number) => sum + b, 0);
             if (sumBids === cardsPerPlayer) {
                 const dealer = gameState.players[dealerIndex];
                 alert(`Dealer (${dealer.name}) must bid such that total bids do not equal ${cardsPerPlayer}. Current total: ${sumBids}`);
@@ -123,7 +131,13 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
             // Check all players have tricks entered (either made via checkmark or missed via X)
             const allPlayersHaveTricks = gameState.players.every((p: any) => {
                 const tricks = inputs[p.email];
-                return tricks !== undefined && tricks !== null && tricks !== '';
+                if (tricks === undefined || tricks === null) {
+                    return false;
+                }
+                if (typeof tricks === 'string' && (tricks === '' || tricks.trim() === '')) {
+                    return false;
+                }
+                return true;
             });
 
             if (!allPlayersHaveTricks) {
@@ -157,13 +171,15 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
             gameState.players.forEach((p: any) => {
                 const bid = activeRound.bids?.[p.email];
                 const tricksValue = inputs[p.email];
+                // Convert tricksValue to number if it's a string
+                const numTricksValue = typeof tricksValue === 'string' ? parseInt(tricksValue, 10) : Number(tricksValue);
                 // Check if player made their bid (tricks equals bid and tricks is not -1)
-                if (bid !== undefined && tricksValue !== undefined && tricksValue !== -1 && bid === tricksValue) {
-                    sumMadeBids += tricksValue;
+                if (bid !== undefined && tricksValue !== undefined && !isNaN(numTricksValue) && numTricksValue !== -1 && bid === numTricksValue) {
+                    sumMadeBids += numTricksValue;
                     madeBidPlayers.push(p.name);
                 }
                 // Track players who bid 0 but are marked as missed
-                if (bid === 0 && tricksValue === -1) {
+                if (bid === 0 && numTricksValue === -1) {
                     zeroBidPlayersMarkedMissed.push(p);
                 }
             });
@@ -188,13 +204,15 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
             gameState.players.forEach((p: any) => {
                 const bid = activeRound.bids?.[p.email];
                 const tricksValue = inputs[p.email];
-                if (bid !== undefined && tricksValue !== undefined && tricksValue !== -1 && bid === tricksValue) {
-                    sumMadeBids += tricksValue;
+                // Convert tricksValue to number if it's a string
+                const numTricksValue = typeof tricksValue === 'string' ? parseInt(tricksValue, 10) : Number(tricksValue);
+                if (bid !== undefined && tricksValue !== undefined && numTricksValue !== -1 && !isNaN(numTricksValue) && bid === numTricksValue) {
+                    sumMadeBids += numTricksValue;
                     // Track players who bid 0 and are marked as made
-                    if (bid === 0 && tricksValue === 0) {
+                    if (bid === 0 && numTricksValue === 0) {
                         zeroBidPlayersMarkedMade.push(p);
                     }
-                } else if (bid !== undefined && tricksValue === -1) {
+                } else if (bid !== undefined && numTricksValue === -1) {
                     // Track if any player missed their bid
                     hasMissedBids = true;
                 }
@@ -218,12 +236,16 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
             // For BIDS, convert blank/undefined values to 0 before sending
             const processedInputs = type === 'BIDS' 
                 ? Object.fromEntries(
-                    gameState.players.map((p: any) => [
-                        p.email,
-                        inputs[p.email] === undefined || inputs[p.email] === null || inputs[p.email] === '' 
-                            ? 0 
-                            : inputs[p.email]
-                    ])
+                    gameState.players.map((p: any) => {
+                        const value = inputs[p.email];
+                        if (value === undefined || value === null) {
+                            return [p.email, 0];
+                        }
+                        if (typeof value === 'string' && (value === '' || value.trim() === '')) {
+                            return [p.email, 0];
+                        }
+                        return [p.email, value];
+                    })
                 )
                 : inputs;
             

@@ -3,27 +3,29 @@ import { getToken } from "next-auth/jwt";
 import { getGoogleFromToken } from "@/lib/google";
 import { setGame, getGame, GameState, getSheetIdFromTempId } from "@/lib/store";
 import { google } from "googleapis";
+import { validateCSRF } from "@/lib/csrf";
 
 // Helper to calc round plan
 function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
-    // 6 cards
-    const maxCards = Math.floor(6 / numPlayers);
+    // 52 cards
+    const maxCards = Math.floor(52 / numPlayers);
     const rounds: { cards: number, trump: string }[] = [];
     const TRUMPS = ['S', 'D', 'C', 'H', 'NT'];
 
     // Down: maxCards..1 (start with max cards and decrease)
     for (let i = maxCards; i >= 1; i--) rounds.push({ cards: i, trump: '' });
-    // Up: 1..maxCards (then increase back up, including 1 again to reach final round = maxCards * 2)
-    for (let i = 1; i <= maxCards; i++) rounds.push({ cards: i, trump: '' });
+    // Up: 2..maxCards (then increase back up, skipping 1 since we already did it)
+    for (let i = 2; i <= maxCards; i++) rounds.push({ cards: i, trump: '' });
 
     // Assign trumps (starting with Spades for round 1)
     return rounds.map((r, i) => ({ ...r, trump: TRUMPS[i % 5] }));
 }
 
 // Helper to calculate final round number
-// Final round = (6 / numberOfPlayers) * 2 (integer division)
+// Final round = (52 / numberOfPlayers) * 2 - 1 (down: maxCards rounds, up: maxCards-1 rounds)
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(6 / numPlayers) * 2;
+    const maxCards = Math.floor(52 / numPlayers);
+    return maxCards * 2 - 1;
 }
 
 // Helper to get dealer index for a round
@@ -35,6 +37,11 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ gameId: string }> }
 ) {
+    // Validate CSRF protection
+    if (!validateCSRF(req)) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+    }
+
     const { gameId } = await params;
     
     // Try to get token with better error handling
@@ -80,10 +87,14 @@ export async function POST(
     }
     if (!game) return NextResponse.json({ error: "Game not loaded" }, { status: 404 });
 
-    // Check Operator
-    if (game.ownerEmail !== token.email) {
-        // Allow if operator logic added, for now assume owner ok
-        // return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Check authorization: Only owner or operator can control rounds
+    const isOwner = game.ownerEmail === token.email;
+    const isOperator = game.operatorEmail === token.email;
+    
+    if (!isOwner && !isOperator) {
+        return NextResponse.json({ 
+            error: "Forbidden: Only the game owner or operator can control rounds" 
+        }, { status: 403 });
     }
 
     let sheets: any = null;
@@ -171,6 +182,29 @@ export async function POST(
                         console.error("Failed to write rounds to sheet:", e);
                         // Continue - game state is updated in memory
                     }
+                }
+            } else if (game.currentRoundIndex === 0) {
+                // Rounds exist but game hasn't started - find first non-completed round or start at round 1
+                const firstActiveRound = game.rounds.find((r: any) => r.state !== 'COMPLETED');
+                if (firstActiveRound) {
+                    game.currentRoundIndex = firstActiveRound.index;
+                } else {
+                    // All rounds completed? Shouldn't happen, but start at round 1
+                    game.currentRoundIndex = 1;
+                }
+                
+                // Update Current Round in Google Sheet (fire-and-forget)
+                if (sheets && !actualGameId.startsWith('temp_')) {
+                    sheets.spreadsheets.values.update({
+                        spreadsheetId: actualGameId,
+                        range: 'Game!B5', // Current Round row
+                        valueInputOption: 'USER_ENTERED',
+                        requestBody: {
+                            values: [[game.currentRoundIndex.toString()]]
+                        }
+                    }).catch((e: any) => {
+                        console.error("Failed to update current round in sheet (continuing anyway):", e);
+                    });
                 }
             }
         } else if (action === 'BIDS') {

@@ -26,12 +26,11 @@ export const authOptions: NextAuthOptions = {
                 httpOnly: true,
                 sameSite: 'lax',
                 path: '/',
-                // Don't set secure for ngrok/http, only for production https
-                secure: false, // Set to true only in production with HTTPS
+                secure: process.env.NODE_ENV === 'production',
             },
         },
     },
-    useSecureCookies: false, // Disable secure cookies for ngrok/http development
+    useSecureCookies: process.env.NODE_ENV === 'production',
     callbacks: {
         async jwt({ token, account, user }) {
             // Initial sign in

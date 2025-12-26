@@ -272,6 +272,28 @@ export default function GamePage() {
         }
     };
 
+    const handleNextRound = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/games/${gameId}/rounds`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'START' })
+            });
+            const data = await res.json();
+            if (res.ok && data.game) {
+                setGameState(data.game);
+            } else {
+                alert(data.error || 'Failed to start next round');
+            }
+        } catch (e) {
+            console.error('Error starting next round:', e);
+            alert('Error starting next round');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (loading) return <div className="flex h-screen items-center justify-center bg-[var(--background)] text-[var(--foreground)]"><Loader2 className="animate-spin" /></div>;
     
     if (!gameState) {
@@ -323,6 +345,7 @@ export default function GamePage() {
                         onOpenEntry={() => setShowEntry(true)}
                         onUndo={handleUndo}
                         onOpenSettings={() => setShowSettings(true)}
+                        onNextRound={handleNextRound}
                     />
                     <ScoreEntryOverlay 
                         isOpen={showEntry} 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { 
     Trophy, 
     History, 
@@ -8,10 +9,12 @@ import {
     Undo2, 
     Crown,
     Home,
-    Sparkles
+    Sparkles,
+    ArrowRight
 } from "lucide-react";
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
+import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
 
 interface ScoreboardProps {
     gameId: string;
@@ -21,6 +24,7 @@ interface ScoreboardProps {
     onOpenEntry: () => void;
     onUndo: () => void;
     onOpenSettings: () => void;
+    onNextRound?: () => void;
 }
 
 // Helper to get trump full name
@@ -50,7 +54,8 @@ function getTrumpIcon(trump: string) {
 
 // Helper to calculate final round number
 function getFinalRoundNumber(numPlayers: number): number {
-    return Math.floor(6 / numPlayers) * 2;
+    const maxCards = Math.floor(52 / numPlayers);
+    return maxCards * 2 - 1;
 }
 
 export function Scoreboard({ 
@@ -60,9 +65,11 @@ export function Scoreboard({
     currentUserEmail, 
     onOpenEntry,
     onUndo,
-    onOpenSettings
+    onOpenSettings,
+    onNextRound
 }: ScoreboardProps) {
     const router = useRouter();
+    const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
     const { players, currentRoundIndex, rounds, firstDealerEmail } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
     
@@ -148,8 +155,9 @@ export function Scoreboard({
                     return (
                         <div 
                             key={player.email} 
+                            onClick={() => setSelectedPlayer(player)}
                             className={`
-                                relative p-4 rounded-xl border bg-[var(--card)] transition-all
+                                relative p-4 rounded-xl border bg-[var(--card)] transition-all cursor-pointer hover:bg-[var(--secondary)]/50
                                 ${isMe ? 'border-[var(--primary)]/50 bg-[var(--primary)]/5' : 'border-[var(--border)]'}
                             `}
                         >
@@ -241,13 +249,22 @@ export function Scoreboard({
                                 </button>
                             </>
                         ) : isOwner ? (
-                            <button 
-                                onClick={onOpenEntry}
-                                className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                            >
-                                <Plus size={24} />
-                                {activeRound?.state === 'BIDDING' ? 'Enter Bids' : 'Enter Scores'}
-                            </button>
+                            activeRound?.state === 'COMPLETED' ? (
+                                <button 
+                                    onClick={onNextRound}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                                >
+                                    Next Round <ArrowRight size={24} />
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={onOpenEntry}
+                                    className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                                >
+                                    <Plus size={24} />
+                                    {activeRound?.state === 'BIDDING' ? 'Enter Bids' : 'Enter Scores'}
+                                </button>
+                            )
                         ) : (
                             <div className="flex-1 text-center text-[var(--muted-foreground)] py-3 font-medium">
                                 Waiting for host...
@@ -266,7 +283,13 @@ export function Scoreboard({
                     </div>
                 </div>
             </div>
+            
+            <PlayerHistoryOverlay 
+                isOpen={!!selectedPlayer} 
+                onClose={() => setSelectedPlayer(null)} 
+                player={selectedPlayer}
+                rounds={rounds}
+            />
         </div>
     );
 }
-
