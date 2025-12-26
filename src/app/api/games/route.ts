@@ -108,6 +108,13 @@ export async function POST(req: NextRequest) {
                 setGame(sheetId, game);
                 // Map temp ID to sheet ID for lookups
                 mapTempIdToSheetId(tempGameId, sheetId);
+                
+                // Broadcast update to all clients (both temp ID and real ID)
+                if ((global as any).broadcastGameUpdate) {
+                    console.log(`[API] Broadcasting game update: tempId=${tempGameId}, sheetId=${sheetId}`);
+                    (global as any).broadcastGameUpdate(tempGameId, game);
+                    (global as any).broadcastGameUpdate(sheetId, game);
+                }
             }
         );
 

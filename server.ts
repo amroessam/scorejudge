@@ -252,7 +252,23 @@ app.prepare().then(() => {
     // Since `server.ts` is the entry point, we can attach to `global`
 
     (global as any).broadcastGameUpdate = (gameId: string, state: GameState) => {
-        const message = JSON.stringify({ type: 'GAME_UPDATE', state });
+        // Always get the latest state from store to ensure we're broadcasting current data
+        let latestState = getGame(gameId);
+        if (!latestState) {
+            // Try to resolve temp ID
+            const realSheetId = getSheetIdFromTempId(gameId);
+            if (realSheetId) {
+                latestState = getGame(realSheetId);
+            }
+        }
+        
+        // Use provided state if we can't find it in store (shouldn't happen, but safety check)
+        if (!latestState) {
+            latestState = state;
+            console.warn(`[Broadcast] Game ${gameId} not found in store, using provided state`);
+        }
+        
+        const message = JSON.stringify({ type: 'GAME_UPDATE', state: latestState });
         let sentCount = 0;
         
         // Get the real sheet ID if gameId is a temp ID
@@ -264,8 +280,13 @@ app.prepare().then(() => {
             }
         }
         
+        console.log(`[Broadcast] Broadcasting update for gameId=${gameId}, actualGameId=${actualGameId}, connectedClients=${clients.size}`);
+        
         for (const [client, clientInfo] of clients.entries()) {
-            if (client.readyState !== WebSocket.OPEN) continue;
+            if (client.readyState !== WebSocket.OPEN) {
+                console.log(`[Broadcast] Skipping client (not open): gameId=${clientInfo.gameId}, readyState=${client.readyState}`);
+                continue;
+            }
             
             // Check if client's gameId matches either the provided gameId or the resolved actualGameId
             // Also check if client's gameId resolves to the same actualGameId
@@ -288,12 +309,15 @@ app.prepare().then(() => {
                 try {
                     client.send(message);
                     sentCount++;
+                    console.log(`[Broadcast] Sent to client: gameId=${clientGameId} (resolved: ${clientActualGameId}), user=${clientInfo.email}`);
                 } catch (e) {
-                    console.error('Error sending WebSocket message:', e);
+                    console.error(`[Broadcast] Error sending to client ${clientInfo.email}:`, e);
                 }
+            } else {
+                console.log(`[Broadcast] Skipped client: gameId=${clientGameId} (resolved: ${clientActualGameId}) doesn't match broadcast gameId=${gameId} (resolved: ${actualGameId})`);
             }
         }
-        console.log(`Broadcasted game update for ${gameId} (actual: ${actualGameId}) to ${sentCount} clients`);
+        console.log(`[Broadcast] Completed: gameId=${gameId}, actualGameId=${actualGameId}, sentTo=${sentCount} clients`);
     };
 
     server.on('upgrade', (req, socket, head) => {

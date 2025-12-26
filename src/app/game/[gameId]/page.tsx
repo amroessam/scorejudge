@@ -137,8 +137,12 @@ export default function GamePage() {
                 socket.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
+                        console.log('[WebSocket] Received message:', data.type, data);
                         if (data.type === 'GAME_UPDATE') {
+                            console.log('[WebSocket] Updating game state from WebSocket');
                             setGameState(data.state);
+                        } else if (data.type === 'ERROR') {
+                            console.error('[WebSocket] Error:', data.message);
                         }
                     } catch (e) {
                         console.error('Error parsing WebSocket message:', e);
