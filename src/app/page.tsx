@@ -33,6 +33,22 @@ export default async function Home() {
           </Link>
         </div>
       </div>
+      
+      <footer className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 text-sm text-[var(--muted-foreground)]">
+        <Link 
+          href="/privacy" 
+          className="hover:text-[var(--foreground)] transition-colors"
+        >
+          Privacy Policy
+        </Link>
+        <span>•</span>
+        <Link 
+          href="/terms" 
+          className="hover:text-[var(--foreground)] transition-colors"
+        >
+          Terms of Service
+        </Link>
+      </footer>
     </div>
   );
 }

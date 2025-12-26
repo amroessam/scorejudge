@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ScoreJudge",
   description: "Live scorekeeper for Judgement card game",
+  verification: {
+    google: "FhwQkFSGcdxBPuIcfiho1qhVQnS7MeRXcTKIlftyors",
+  },
 };
 
 import Providers from "./providers";
