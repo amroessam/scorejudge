@@ -213,6 +213,19 @@ app.prepare().then(() => {
         }
 
         console.log(`Client connected to game ${gameId} (user: ${authResult.email})`);
+        
+        // Store both the original gameId and resolve to actual ID if needed
+        // This helps with matching in broadcasts
+        let actualGameId = gameId;
+        if (gameId.startsWith('temp_')) {
+            const realSheetId = getSheetIdFromTempId(gameId);
+            if (realSheetId) {
+                actualGameId = realSheetId;
+                console.log(`[WebSocket] Resolved temp ID ${gameId} to ${actualGameId}`);
+            }
+        }
+        
+        // Store client with original gameId (for matching) but also track actual ID
         clients.set(ws, { gameId, email: authResult.email! });
 
         // Send current state - use retry logic to handle race conditions
@@ -241,8 +254,37 @@ app.prepare().then(() => {
     (global as any).broadcastGameUpdate = (gameId: string, state: GameState) => {
         const message = JSON.stringify({ type: 'GAME_UPDATE', state });
         let sentCount = 0;
+        
+        // Get the real sheet ID if gameId is a temp ID
+        let actualGameId = gameId;
+        if (gameId.startsWith('temp_')) {
+            const realSheetId = getSheetIdFromTempId(gameId);
+            if (realSheetId) {
+                actualGameId = realSheetId;
+            }
+        }
+        
         for (const [client, clientInfo] of clients.entries()) {
-            if (client.readyState === WebSocket.OPEN && clientInfo.gameId === gameId) {
+            if (client.readyState !== WebSocket.OPEN) continue;
+            
+            // Check if client's gameId matches either the provided gameId or the resolved actualGameId
+            // Also check if client's gameId resolves to the same actualGameId
+            let clientGameId = clientInfo.gameId;
+            let clientActualGameId = clientGameId;
+            if (clientGameId.startsWith('temp_')) {
+                const resolvedId = getSheetIdFromTempId(clientGameId);
+                if (resolvedId) {
+                    clientActualGameId = resolvedId;
+                }
+            }
+            
+            // Match if: exact match OR both resolve to same actual ID
+            const matches = clientGameId === gameId || 
+                          clientGameId === actualGameId ||
+                          clientActualGameId === gameId ||
+                          clientActualGameId === actualGameId;
+            
+            if (matches) {
                 try {
                     client.send(message);
                     sentCount++;
@@ -251,7 +293,7 @@ app.prepare().then(() => {
                 }
             }
         }
-        console.log(`Broadcasted game update for ${gameId} to ${sentCount} clients`);
+        console.log(`Broadcasted game update for ${gameId} (actual: ${actualGameId}) to ${sentCount} clients`);
     };
 
     server.on('upgrade', (req, socket, head) => {
