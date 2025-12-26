@@ -1,6 +1,6 @@
 import { getGoogleFromToken, listValidationGames, createGameResourcesInSheetAsync } from "@/lib/google";
 import { NextRequest, NextResponse } from "next/server";
-import { setGame, type GameState, mapTempIdToSheetId, getSheetIdFromTempId } from "@/lib/store";
+import { setGame, getGame, type GameState, mapTempIdToSheetId, getSheetIdFromTempId } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 
@@ -80,6 +80,15 @@ export async function POST(req: NextRequest) {
             lastUpdated: Date.now()
         };
         setGame(tempId, initialGameState);
+        console.log(`[API] Created game ${tempId} in memory. Owner: ${token.email}`);
+        
+        // Verify it was stored
+        const verifyGame = getGame(tempId);
+        if (!verifyGame) {
+            console.error(`[API] ERROR: Game ${tempId} was not stored properly!`);
+        } else {
+            console.log(`[API] Verified game ${tempId} is in memory`);
+        }
 
         // Create Google Sheet resources in background
         // When sheet is created, update game state with real sheetId

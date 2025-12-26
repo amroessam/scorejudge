@@ -106,19 +106,27 @@ app.prepare().then(() => {
                     // Try to resolve temp ID
                     const realSheetId = getSheetIdFromTempId(gameId);
                     if (realSheetId) {
+                        console.log(`[findGame] Resolved temp ID ${gameId} to ${realSheetId}`);
                         game = getGame(realSheetId);
                     }
                 }
                 
                 if (game) {
+                    console.log(`[findGame] Found game ${gameId} on attempt ${attempts}`);
                     resolve(game);
                     return;
+                }
+                
+                // Log what we're looking for
+                if (attempts === 1) {
+                    console.log(`[findGame] Looking for game ${gameId}, attempt ${attempts}/${maxRetries}`);
                 }
                 
                 // If not found and we have retries left, try again
                 if (attempts < maxRetries) {
                     setTimeout(tryFind, delayMs);
                 } else {
+                    console.error(`[findGame] Game ${gameId} not found after ${maxRetries} attempts`);
                     resolve(null);
                 }
             };
@@ -145,12 +153,27 @@ app.prepare().then(() => {
 
             // Try to find game with retry logic to handle race conditions
             // For temp IDs, the game might be created asynchronously
-            const game = await findGame(gameId, gameId.startsWith('temp_') ? 5 : 1, 200);
+            // Increase retries and delay for temp IDs since they're created in API routes
+            const maxRetries = gameId.startsWith('temp_') ? 10 : 3;
+            const delayMs = gameId.startsWith('temp_') ? 300 : 100;
+            
+            console.log(`[WebSocket auth] Looking for game ${gameId} (maxRetries: ${maxRetries}, delay: ${delayMs}ms)`);
+            const game = await findGame(gameId, maxRetries, delayMs);
             
             if (!game) {
-                console.error(`WebSocket auth: Game ${gameId} not found after retries`);
+                console.error(`[WebSocket auth] Game ${gameId} not found after ${maxRetries} retries`);
+                // Log available games for debugging (only first few to avoid spam)
+                const gameStore = (global as any).gameStore as Map<string, any> | undefined;
+                if (gameStore) {
+                    const allGames = Array.from(gameStore.keys());
+                    console.error(`[WebSocket auth] Available games: ${allGames.slice(0, 5).join(', ')}${allGames.length > 5 ? '...' : ''}`);
+                } else {
+                    console.error(`[WebSocket auth] gameStore not found on global object!`);
+                }
                 return { valid: false, error: 'Game not found' };
             }
+            
+            console.log(`[WebSocket auth] Found game ${gameId}, validating player membership`);
 
             // Check if user is a player in the game OR is the owner
             // Owner should be able to connect even if not explicitly in players list (edge case)

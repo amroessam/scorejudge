@@ -36,9 +36,13 @@ export interface GameState {
 
 const globalForStore = globalThis as unknown as { gameStore: Map<string, GameState> };
 
-const games = globalForStore.gameStore || new Map<string, GameState>();
+// Always use the same store instance across the application
+// This ensures API routes and WebSocket server share the same memory
+if (!globalForStore.gameStore) {
+    globalForStore.gameStore = new Map<string, GameState>();
+}
 
-if (process.env.NODE_ENV !== 'production') globalForStore.gameStore = games;
+const games = globalForStore.gameStore;
 
 export function getGame(id: string) {
     return games.get(id);
@@ -64,8 +68,13 @@ export function removeGame(id: string) {
 
 // Map temporary IDs to real sheet IDs
 const globalForIdMap = globalThis as unknown as { tempIdMap: Map<string, string> };
-const tempIdMap = globalForIdMap.tempIdMap || new Map<string, string>();
-if (process.env.NODE_ENV !== 'production') globalForIdMap.tempIdMap = tempIdMap;
+
+// Always use the same tempIdMap instance across the application
+if (!globalForIdMap.tempIdMap) {
+    globalForIdMap.tempIdMap = new Map<string, string>();
+}
+
+const tempIdMap = globalForIdMap.tempIdMap;
 
 export function mapTempIdToSheetId(tempId: string, sheetId: string) {
     tempIdMap.set(tempId, sheetId);
