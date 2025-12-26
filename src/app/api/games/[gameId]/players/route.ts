@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 import { getGame, setGame, getSheetIdFromTempId } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
+import { getAuthToken } from "@/lib/auth-utils";
 
 export async function PATCH(
     req: NextRequest,
@@ -14,20 +14,7 @@ export async function PATCH(
 
     const { gameId } = await params;
     
-    // Auth check
-    let token;
-    try {
-        token = await getToken({ 
-            req, 
-            secret: process.env.NEXTAUTH_SECRET,
-            cookieName: process.env.NODE_ENV === 'production' 
-                ? '__Secure-next-auth.session-token' 
-                : 'next-auth.session-token'
-        });
-    } catch (e) {
-        console.error('Error getting token:', e);
-        return NextResponse.json({ error: "Authentication error" }, { status: 401 });
-    }
+    const token = await getAuthToken(req);
     
     if (!token) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

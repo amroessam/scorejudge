@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 import { getGoogleFromToken } from "@/lib/google";
 import { fetchGameFromSheet } from "@/lib/game-logic";
 import { setGame, getGame, getSheetIdFromTempId } from "@/lib/store";
 import { google } from "googleapis";
 import { validateCSRF } from "@/lib/csrf";
+import { getAuthToken } from "@/lib/auth-utils";
 
 export async function POST(
     req: NextRequest,
@@ -17,20 +17,7 @@ export async function POST(
 
     const { gameId } = await params;
     
-    // Try to get token with better error handling
-    let token;
-    try {
-        token = await getToken({ 
-            req, 
-            secret: process.env.NEXTAUTH_SECRET,
-            cookieName: process.env.NODE_ENV === 'production' 
-                ? '__Secure-next-auth.session-token' 
-                : 'next-auth.session-token'
-        });
-    } catch (e) {
-        console.error('Error getting token:', e);
-        return NextResponse.json({ error: "Authentication error" }, { status: 401 });
-    }
+    const token = await getAuthToken(req);
     
     if (!token) {
         console.error('No token found. Cookies:', req.cookies.getAll());

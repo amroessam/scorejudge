@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 import { getGoogleFromToken } from "@/lib/google";
 import { fetchGameFromSheet } from "@/lib/game-logic"; // Ensure this matches file path
 import { setGame, getGame, removeGame, getSheetIdFromTempId, updateGame } from "@/lib/store";
 import { google } from "googleapis";
 import { validateCSRF } from "@/lib/csrf";
+import { getAuthToken } from "@/lib/auth-utils";
 
 export async function GET(
     req: NextRequest,
@@ -28,7 +28,7 @@ export async function GET(
     }
 
     // 2. Try to fetch from Sheet (requires auth)
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getAuthToken(req);
     
     if (!token) {
         // Game not in memory and user not authenticated
@@ -76,7 +76,7 @@ export async function PATCH(
     }
 
     const { gameId } = await params;
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getAuthToken(req);
     
     if (!token) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -152,7 +152,7 @@ export async function DELETE(
     }
 
     const { gameId } = await params;
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getAuthToken(req);
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {

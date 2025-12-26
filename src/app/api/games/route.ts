@@ -1,14 +1,15 @@
 import { getGoogleFromToken, listValidationGames, createGameResourcesInSheetAsync } from "@/lib/google";
-import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import { setGame, type GameState, mapTempIdToSheetId, getSheetIdFromTempId } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
+import { getAuthToken } from "@/lib/auth-utils";
 
 // Using Route Handler for data fetching to keep credentials server-side
 export async function GET(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getAuthToken(req);
 
     if (!token) {
+        console.error('GET: No token found. Cookies:', req.cookies.getAll().map(c => c.name));
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -28,22 +29,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
     }
 
-    let token;
-    try {
-        token = await getToken({ 
-            req, 
-            secret: process.env.NEXTAUTH_SECRET,
-            cookieName: process.env.NODE_ENV === 'production' 
-                ? '__Secure-next-auth.session-token' 
-                : 'next-auth.session-token'
-        });
-    } catch (e) {
-        console.error('Error getting token:', e);
-        return NextResponse.json({ error: "Authentication error" }, { status: 401 });
-    }
+    const token = await getAuthToken(req);
     
     if (!token) {
-        console.error('No token found. Cookies:', req.cookies.getAll());
+        console.error('POST: No token found. Cookies:', req.cookies.getAll().map(c => c.name));
         return NextResponse.json({ error: "Unauthorized - Please sign in again" }, { status: 401 });
     }
 

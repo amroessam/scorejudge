@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 import { getGoogleFromToken } from "@/lib/google";
 import { setGame, getGame, GameState, getSheetIdFromTempId } from "@/lib/store";
 import { google } from "googleapis";
 import { validateCSRF } from "@/lib/csrf";
+import { getAuthToken } from "@/lib/auth-utils";
 
 // Helper to calc round plan
 function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
@@ -44,27 +44,11 @@ export async function POST(
 
     const { gameId } = await params;
     
-    // Try to get token with better error handling
-    let token;
-    try {
-        token = await getToken({ 
-            req, 
-            secret: process.env.NEXTAUTH_SECRET,
-            cookieName: process.env.NODE_ENV === 'production' 
-                ? '__Secure-next-auth.session-token' 
-                : 'next-auth.session-token'
-        });
-    } catch (e) {
-        console.error('Error getting token:', e);
-        return NextResponse.json({ error: "Authentication error" }, { status: 401 });
-    }
+    const token = await getAuthToken(req);
     
     if (!token) {
         const cookies = req.cookies.getAll();
         console.error('No token found. Available cookies:', cookies.map(c => c.name));
-        console.error('Looking for cookie:', process.env.NODE_ENV === 'production' 
-            ? '__Secure-next-auth.session-token' 
-            : 'next-auth.session-token');
         return NextResponse.json({ error: "Unauthorized - Please sign in again" }, { status: 401 });
     }
 
