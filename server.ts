@@ -32,61 +32,109 @@ app.prepare().then(() => {
 
     const wss = new WebSocketServer({ noServer: true });
 
+    // Helper function to get token with proper cookie name handling (similar to auth-utils)
+    async function getWebSocketToken(req: IncomingMessage) {
+        const cookieHeader = req.headers.cookie;
+        if (!cookieHeader) return null;
+
+        // Parse cookies manually
+        const cookies: Record<string, string> = {};
+        cookieHeader.split(';').forEach(cookie => {
+            const [name, ...valueParts] = cookie.trim().split('=');
+            if (name && valueParts.length > 0) {
+                cookies[name.trim()] = decodeURIComponent(valueParts.join('=').trim());
+            }
+        });
+
+        // Create a mock request object that matches Next.js Request structure
+        const mockReq = {
+            headers: {
+                cookie: cookieHeader,
+                host: req.headers.host || 'localhost:3000',
+            },
+            cookies: {
+                get: (name: string) => {
+                    const value = cookies[name];
+                    return value ? { name, value } : undefined;
+                },
+                getAll: () => Object.entries(cookies).map(([name, value]) => ({ name, value })),
+            },
+            url: req.url || '',
+        } as any;
+
+        const isProduction = process.env.NODE_ENV === 'production';
+        
+        // Try production cookie name first if in production
+        if (isProduction) {
+            try {
+                const token = await getToken({ 
+                    req: mockReq, 
+                    secret: process.env.NEXTAUTH_SECRET,
+                    cookieName: '__Secure-next-auth.session-token'
+                });
+                if (token) return token;
+            } catch (e) {
+                // Fall through to try standard cookie name
+            }
+        }
+        
+        // Try standard cookie name
+        try {
+            const token = await getToken({ 
+                req: mockReq, 
+                secret: process.env.NEXTAUTH_SECRET,
+                cookieName: 'next-auth.session-token'
+            });
+            return token;
+        } catch (e) {
+            console.error('Error getting WebSocket token:', e);
+            return null;
+        }
+    }
+
+    // Helper function to find game with retry logic for race conditions
+    function findGame(gameId: string, maxRetries = 3, delayMs = 100): Promise<any> {
+        return new Promise((resolve) => {
+            let attempts = 0;
+            
+            const tryFind = () => {
+                attempts++;
+                
+                // Check memory first
+                let game = getGame(gameId);
+                if (!game) {
+                    // Try to resolve temp ID
+                    const realSheetId = getSheetIdFromTempId(gameId);
+                    if (realSheetId) {
+                        game = getGame(realSheetId);
+                    }
+                }
+                
+                if (game) {
+                    resolve(game);
+                    return;
+                }
+                
+                // If not found and we have retries left, try again
+                if (attempts < maxRetries) {
+                    setTimeout(tryFind, delayMs);
+                } else {
+                    resolve(null);
+                }
+            };
+            
+            tryFind();
+        });
+    }
+
     // Helper function to validate WebSocket authentication
     async function validateWebSocketAuth(req: IncomingMessage, gameId: string): Promise<{ valid: boolean; email?: string; error?: string }> {
         try {
-            // Parse cookies from request headers
-            const cookieHeader = req.headers.cookie;
-            if (!cookieHeader) {
-                console.error('WebSocket auth: No cookies in headers');
-                return { valid: false, error: 'No cookies provided' };
-            }
-
-            const cookieName = process.env.NODE_ENV === 'production'
-                ? '__Secure-next-auth.session-token'
-                : 'next-auth.session-token';
-
-            // Parse cookies manually
-            const cookies: Record<string, string> = {};
-            cookieHeader.split(';').forEach(cookie => {
-                const [name, ...valueParts] = cookie.trim().split('=');
-                if (name && valueParts.length > 0) {
-                    cookies[name.trim()] = decodeURIComponent(valueParts.join('=').trim());
-                }
-            });
-
-            if (!cookies[cookieName]) {
-                console.error('WebSocket auth: Session token cookie not found. Cookie name:', cookieName);
-                console.error('WebSocket auth: Available cookies:', Object.keys(cookies));
-                return { valid: false, error: 'Session token cookie not found' };
-            }
-
-            // Create a mock request object that matches Next.js Request structure
-            // getToken expects a request with cookies() method
-            const mockReq = {
-                headers: {
-                    cookie: cookieHeader,
-                    host: req.headers.host || 'localhost:3000',
-                },
-                cookies: {
-                    get: (name: string) => {
-                        const value = cookies[name];
-                        return value ? { name, value } : undefined;
-                    },
-                    getAll: () => Object.entries(cookies).map(([name, value]) => ({ name, value })),
-                },
-                url: req.url || '',
-            } as any;
-
-            // Validate session token
-            const token = await getToken({
-                req: mockReq,
-                secret: process.env.NEXTAUTH_SECRET,
-                cookieName: cookieName
-            });
-
+            // Get token using the helper that tries both cookie names
+            const token = await getWebSocketToken(req);
+            
             if (!token) {
-                console.error('WebSocket auth: getToken returned null/undefined');
+                console.error('WebSocket auth: No token found. Available cookies:', req.headers.cookie?.split(';').map(c => c.split('=')[0]));
                 return { valid: false, error: 'Invalid or missing session token' };
             }
 
@@ -95,17 +143,12 @@ app.prepare().then(() => {
                 return { valid: false, error: 'Invalid or missing session token' };
             }
 
-            // Check if user is a player in the game
-            let game = getGame(gameId);
-            if (!game) {
-                // Try to resolve temp ID
-                const realSheetId = getSheetIdFromTempId(gameId);
-                if (realSheetId) {
-                    game = getGame(realSheetId);
-                }
-            }
+            // Try to find game with retry logic to handle race conditions
+            // For temp IDs, the game might be created asynchronously
+            const game = await findGame(gameId, gameId.startsWith('temp_') ? 5 : 1, 200);
             
             if (!game) {
+                console.error(`WebSocket auth: Game ${gameId} not found after retries`);
                 return { valid: false, error: 'Game not found' };
             }
 
@@ -149,15 +192,8 @@ app.prepare().then(() => {
         console.log(`Client connected to game ${gameId} (user: ${authResult.email})`);
         clients.set(ws, { gameId, email: authResult.email! });
 
-        // Send current state if valid
-        let state = getGame(gameId);
-        if (!state) {
-            // Try to resolve temp ID
-            const realSheetId = getSheetIdFromTempId(gameId);
-            if (realSheetId) {
-                state = getGame(realSheetId);
-            }
-        }
+        // Send current state - use retry logic to handle race conditions
+        const state = await findGame(gameId, gameId.startsWith('temp_') ? 5 : 1, 200);
         
         if (state) {
             ws.send(JSON.stringify({ type: 'GAME_UPDATE', state }));
