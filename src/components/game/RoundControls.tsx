@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Check, X } from "lucide-react";
+import { DECK_SIZE } from "@/lib/config";
 
 // Helper function to convert trump abbreviation to full text
 function getTrumpFullName(trump: string): string {
@@ -16,9 +17,9 @@ function getTrumpFullName(trump: string): string {
 }
 
 // Helper to calculate final round number
-// Final round = (52 / numberOfPlayers) * 2 - 1 (down: maxCards rounds, up: maxCards-1 rounds)
+// Final round = (DECK_SIZE / numberOfPlayers) * 2 - 1 (down: maxCards rounds, up: maxCards-1 rounds)
 function getFinalRoundNumber(numPlayers: number): number {
-    const maxCards = Math.floor(52 / numPlayers);
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
     return maxCards * 2 - 1;
 }
 

@@ -124,6 +124,7 @@ export function parseGameStateFromSheet(sheetData: any, gameId: string): GameSta
     // Get owner email from Game metadata or first player
     const ownerEmail = gameRows.find((r: string[]) => r[0] === 'Owner Email')?.[1] || players[0]?.email || '';
     
+    const now = Date.now();
     return {
         id: gameId,
         name: gameName,
@@ -132,7 +133,8 @@ export function parseGameStateFromSheet(sheetData: any, gameId: string): GameSta
         currentRoundIndex: currentRoundIndex || 0,
         ownerEmail: ownerEmail || '',
         operatorEmail: gameRows.find((r: string[]) => r[0] === 'Operator Email')?.[1] || ownerEmail || '', // Defaults to owner
-        lastUpdated: Date.now()
+        createdAt: now, // Use current time when parsing from sheet (sheet doesn't store createdAt)
+        lastUpdated: now
     };
 }
 
