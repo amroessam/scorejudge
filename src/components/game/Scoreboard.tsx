@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
     Trophy, 
     History, 
@@ -15,6 +15,8 @@ import {
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
+import { DECK_SIZE } from "@/lib/config";
+import confetti from "canvas-confetti";
 
 interface ScoreboardProps {
     gameId: string;
@@ -54,7 +56,7 @@ function getTrumpIcon(trump: string) {
 
 // Helper to calculate final round number
 function getFinalRoundNumber(numPlayers: number): number {
-    const maxCards = Math.floor(52 / numPlayers);
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
     return maxCards * 2 - 1;
 }
 
@@ -100,11 +102,78 @@ export function Scoreboard({
 
     const sortedPlayers = [...players].sort((a: Player, b: Player) => b.score - a.score);
     const leaderEmail = sortedPlayers[0]?.email;
+    const lastPlayer = sortedPlayers[sortedPlayers.length - 1];
+    const isWinner = currentUserEmail === leaderEmail;
+    const isLastPlayer = currentUserEmail === lastPlayer?.email;
+
+    // Trigger confetti for winner when game ends
+    useEffect(() => {
+        if (isGameEnded && isWinner) {
+            // Fire confetti multiple times for a longer celebration
+            const duration = 5000;
+            const end = Date.now() + duration;
+
+            const interval = setInterval(() => {
+                if (Date.now() > end) {
+                    clearInterval(interval);
+                    return;
+                }
+
+                confetti({
+                    particleCount: 3,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A']
+                });
+                confetti({
+                    particleCount: 3,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A']
+                });
+            }, 250);
+            
+            // Cleanup function to clear interval if component unmounts or dependencies change
+            return () => {
+                clearInterval(interval);
+            };
+        }
+    }, [isGameEnded, isWinner]);
 
     return (
-        <div className="flex flex-col h-full bg-[var(--background)]">
-            {/* Sticky Top Bar */}
-            <div className="sticky top-0 z-10 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--border)] p-4 safe-pb-0">
+        <div className="flex flex-col h-full bg-[var(--background)] overflow-hidden">
+            {/* Winner Confetti Overlay - only visible to winner */}
+            {isGameEnded && isWinner && (
+                <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="text-6xl mb-4 animate-bounce">🎉</div>
+                        <div className="text-4xl font-bold text-yellow-400 drop-shadow-lg">
+                            YOU WON!
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Last Player Message */}
+            {isGameEnded && isLastPlayer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 via-green-500 via-blue-500 via-indigo-500 to-purple-500 p-1 rounded-2xl animate-pulse">
+                        <div className="bg-[var(--card)] rounded-xl p-8 text-center">
+                            <div className="text-8xl mb-4 animate-bounce">🏳️‍🌈</div>
+                            <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 via-green-500 via-blue-500 via-indigo-500 to-purple-500 mb-2">
+                                YOU ARE GAY
+                            </div>
+                            <div className="text-xl text-[var(--muted-foreground)] mt-4">
+                                Better luck next time! 🎮
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Top Bar */}
+            <div className="z-10 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--border)] p-4 pt-safe-top">
                 <div className="flex justify-between items-center">
                     <div>
                         <h2 className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
@@ -131,7 +200,7 @@ export function Scoreboard({
                     {!isGameEnded && (
                         <button 
                             onClick={handleGoToDashboard}
-                            className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform"
+                            className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
                             title="Dashboard"
                         >
                             <Home size={24} />
@@ -141,11 +210,12 @@ export function Scoreboard({
             </div>
 
             {/* Score List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
-                {players.map((player: Player) => {
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 overscroll-contain">
+                {sortedPlayers.map((player: Player) => {
                     const isLeader = player.email === leaderEmail && currentRoundIndex > 1;
                     const isDealer = player.email === dealer?.email;
                     const isMe = player.email === currentUserEmail;
+                    const isLast = player.email === lastPlayer?.email && isGameEnded;
                     
                     const bid = activeRound?.bids?.[player.email];
                     const tricks = activeRound?.tricks?.[player.email];
@@ -157,20 +227,37 @@ export function Scoreboard({
                             key={player.email} 
                             onClick={() => setSelectedPlayer(player)}
                             className={`
-                                relative p-4 rounded-xl border bg-[var(--card)] transition-all cursor-pointer hover:bg-[var(--secondary)]/50
+                                relative p-4 rounded-xl border bg-[var(--card)] transition-all cursor-pointer hover:bg-[var(--secondary)]/50 touch-manipulation
                                 ${isMe ? 'border-[var(--primary)]/50 bg-[var(--primary)]/5' : 'border-[var(--border)]'}
+                                ${isLast && isGameEnded ? 'border-2 border-purple-500/50 bg-gradient-to-r from-red-500/10 via-yellow-500/10 via-green-500/10 via-blue-500/10 via-indigo-500/10 to-purple-500/10' : ''}
                             `}
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     {/* Avatar/Dealer Chip */}
                                     <div className="relative">
-                                        <div className={`
-                                            w-10 h-10 rounded-full flex items-center justify-center font-bold
-                                            ${isLeader ? 'bg-yellow-500 text-black' : 'bg-[var(--secondary)] text-[var(--muted-foreground)]'}
-                                        `}>
-                                            {isLeader ? <Trophy size={18} /> : player.name.charAt(0)}
-                                        </div>
+                                        {isLeader ? (
+                                            <div className="w-10 h-10 rounded-full bg-yellow-500 text-black flex items-center justify-center">
+                                                <Trophy size={18} />
+                                            </div>
+                                        ) : isLast && isGameEnded ? (
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center text-2xl">
+                                                🏳️‍🌈
+                                            </div>
+                                        ) : player.image ? (
+                                            <img 
+                                                src={player.image} 
+                                                alt={player.name}
+                                                className="w-10 h-10 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className={`
+                                                w-10 h-10 rounded-full flex items-center justify-center font-bold
+                                                bg-[var(--secondary)] text-[var(--muted-foreground)]
+                                            `}>
+                                                {player.name.charAt(0)}
+                                            </div>
+                                        )}
                                         {isDealer && (
                                             <div className="absolute -top-1 -right-1 bg-[var(--primary)] text-white p-0.5 rounded-full shadow-sm border border-[var(--background)]">
                                                 <span className="text-[10px] font-bold px-1">D</span>
@@ -181,6 +268,7 @@ export function Scoreboard({
                                     <div>
                                         <div className="font-semibold text-lg leading-none mb-1">
                                             {player.name} {isMe && <span className="text-xs font-normal text-[var(--muted-foreground)]">(You)</span>}
+                                            {isLast && isGameEnded && <span className="ml-2 text-2xl">🏳️‍🌈</span>}
                                         </div>
                                         {/* Current Round Stats */}
                                         {activeRound && (
@@ -214,15 +302,15 @@ export function Scoreboard({
                 })}
             </div>
 
-            {/* Sticky Bottom Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-[var(--background)]/90 backdrop-blur-md border-t border-[var(--border)] safe-pb">
+            {/* Bottom Bar */}
+            <div className="bg-[var(--background)]/90 backdrop-blur-md border-t border-[var(--border)] safe-pb">
                 <div className="px-4 pb-4 pt-4">
                     <div className="flex items-center gap-4 max-w-md mx-auto">
                         {/* Secondary Actions - Only show undo for host, and only if game not ended */}
                         {isOwner && !isGameEnded && (
                             <button 
                                 onClick={onUndo}
-                                className="p-3 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform"
+                                className="p-3 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
                             >
                                 <Undo2 size={24} />
                             </button>
@@ -234,7 +322,7 @@ export function Scoreboard({
                                 {/* Create New Game Button */}
                                 <button 
                                     onClick={handleCreateNewGame}
-                                    className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                                    className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
                                     <Sparkles size={20} />
                                     New Game
@@ -242,29 +330,29 @@ export function Scoreboard({
                                 {/* Dashboard Button */}
                                 <button 
                                     onClick={handleGoToDashboard}
-                                    className="flex-1 bg-[var(--secondary)] text-[var(--foreground)] py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                                    className="flex-1 bg-[var(--secondary)] text-[var(--foreground)] py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
                                     <Home size={20} />
                                     Dashboard
                                 </button>
                             </>
                         ) : isOwner ? (
-                            activeRound?.state === 'COMPLETED' ? (
+                            activeRound?.state === 'COMPLETED' && !isGameEnded ? (
                                 <button 
                                     onClick={onNextRound}
-                                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
                                     Next Round <ArrowRight size={24} />
                                 </button>
-                            ) : (
+                            ) : !isGameEnded ? (
                                 <button 
                                     onClick={onOpenEntry}
-                                    className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                                    className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
                                     <Plus size={24} />
                                     {activeRound?.state === 'BIDDING' ? 'Enter Bids' : 'Enter Scores'}
                                 </button>
-                            )
+                            ) : null
                         ) : (
                             <div className="flex-1 text-center text-[var(--muted-foreground)] py-3 font-medium">
                                 Waiting for host...
@@ -275,7 +363,7 @@ export function Scoreboard({
                         {!isGameEnded && (
                             <button 
                                 onClick={onOpenSettings}
-                                className="p-3 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform"
+                                className="p-3 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
                             >
                                 <Settings size={24} />
                             </button>
