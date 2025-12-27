@@ -1,21 +1,44 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { DEBUG_MODE } from "./config";
+
+const providers: any[] = [
+    GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        authorization: {
+            params: {
+                scope: "openid email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets",
+                prompt: "consent",
+                access_type: "offline",
+                response_type: "code",
+            },
+        },
+    }),
+];
+
+// Add anonymous credentials provider in debug mode
+if (DEBUG_MODE) {
+    providers.push(
+        CredentialsProvider({
+            name: "anonymous",
+            credentials: {},
+            async authorize() {
+                // Generate a unique anonymous user
+                const id = `anon_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+                return {
+                    id,
+                    name: `Anonymous User ${id.substring(5, 13)}`,
+                    email: `anonymous-${id}@debug.local`,
+                };
+            },
+        })
+    );
+}
 
 export const authOptions: NextAuthOptions = {
-    providers: [
-        GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID!,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-            authorization: {
-                params: {
-                    scope: "openid email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets",
-                    prompt: "consent",
-                    access_type: "offline",
-                    response_type: "code",
-                },
-            },
-        }),
-    ],
+    providers,
     session: {
         strategy: "jwt",
     },
@@ -43,6 +66,7 @@ export const authOptions: NextAuthOptions = {
                     refreshToken: account.refresh_token,
                     expiresAt: account.expires_at,  // UNIX timestamp in seconds
                     id: user.id,
+                    picture: user.image || undefined,
                 };
             }
 
@@ -55,6 +79,9 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             if (session.user) {
                 session.user.id = token.id as string;
+                if (token.picture) {
+                    session.user.image = token.picture as string;
+                }
             }
             return session;
         },

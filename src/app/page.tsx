@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { DEBUG_MODE } from "@/lib/config";
+import DebugLoginButton from "./debug-login-button";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -31,6 +33,8 @@ export default async function Home() {
           >
             Join Existing Game
           </Link>
+
+          {DEBUG_MODE && <DebugLoginButton />}
         </div>
       </div>
       
