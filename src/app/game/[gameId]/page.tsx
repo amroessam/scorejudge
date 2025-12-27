@@ -10,6 +10,7 @@ import { GameSetup } from "@/components/game/GameSetup";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { ScoreEntryOverlay } from "@/components/game/ScoreEntryOverlay";
 import { Player } from "@/lib/store";
+import { DECK_SIZE } from "@/lib/config";
 
 export default function GamePage() {
     const params = useParams();
@@ -112,17 +113,36 @@ export default function GamePage() {
         loadGame();
     }, [gameId]);
 
-    // WebSocket Connection
+    // Determine if user has joined (needed for WebSocket connection)
+    const players = gameState?.players || [];
+    const isOwner = session?.user?.email === gameState?.ownerEmail;
+    const isJoined = session?.user?.email ? players.some((p: Player) => p.email === session.user.email) : false;
+
+    // WebSocket Connection - only connect if user has joined the game
     useEffect(() => {
-        if (!gameId) return;
+        if (!gameId || !gameState) return;
+        
+        // Only connect WebSocket if user is a player or owner
+        // This prevents "User is not a player" errors for users who haven't joined yet
+        if (!isJoined && !isOwner) {
+            console.log('[WebSocket] Skipping connection - user has not joined the game yet');
+            return;
+        }
         
         let socket: WebSocket | null = null;
         let reconnectTimeout: NodeJS.Timeout | null = null;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         const reconnectDelay = 3000;
+        let permanentError = false; // Track permanent errors that shouldn't trigger reconnection
 
         const connectWebSocket = () => {
+            // Don't attempt to reconnect if we've encountered a permanent error
+            if (permanentError) {
+                console.log('[WebSocket] Skipping reconnection due to permanent error');
+                return;
+            }
+
             try {
                 const protocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${globalThis.location.host}/ws?gameId=${gameId}`;
@@ -131,6 +151,7 @@ export default function GamePage() {
                 socket.onopen = () => {
                     console.log("WebSocket connected");
                     reconnectAttempts = 0;
+                    permanentError = false; // Reset permanent error on successful connection
                     socket?.send(JSON.stringify({ type: 'JOIN_GAME', gameId }));
                 };
 
@@ -142,19 +163,55 @@ export default function GamePage() {
                             console.log('[WebSocket] Updating game state from WebSocket');
                             setGameState(data.state);
                         } else if (data.type === 'ERROR') {
-                            console.error('[WebSocket] Error:', data.message);
+                            const errorMessage = data.message || 'Unknown error';
+                            console.error('[WebSocket] Error:', errorMessage);
+                            
+                            // Mark as permanent error if it's a "Game not found" error
+                            // These errors indicate the game doesn't exist and reconnection won't help
+                            if (errorMessage.includes('Game not found') || 
+                                errorMessage.includes('not found') ||
+                                errorMessage.includes('Authentication failed')) {
+                                permanentError = true;
+                                console.log('[WebSocket] Permanent error detected, will not reconnect');
+                            }
                         }
                     } catch (e) {
                         console.error('Error parsing WebSocket message:', e);
                     }
                 };
 
+                socket.onerror = (event) => {
+                    // WebSocket error events don't provide much detail, but we should handle them gracefully
+                    console.error('[WebSocket] Error event occurred');
+                    // Don't set permanentError here as connection errors might be transient
+                };
+
                 socket.onclose = (event) => {
-                    console.log('WebSocket disconnected', event.code);
+                    console.log('WebSocket disconnected', event.code, event.reason);
                     socket = null;
-                    if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+                    
+                    // Don't reconnect for:
+                    // - Clean close (1000)
+                    // - Policy violation (1008) - typically means "Game not found" or auth failure
+                    // - Permanent errors
+                    // - Max reconnection attempts reached
+                    const isPolicyViolation = event.code === 1008;
+                    const shouldReconnect = !permanentError && 
+                                          event.code !== 1000 && 
+                                          !isPolicyViolation &&
+                                          reconnectAttempts < maxReconnectAttempts;
+                    
+                    if (isPolicyViolation) {
+                        permanentError = true;
+                        console.log('[WebSocket] Policy violation detected, will not reconnect');
+                    }
+                    
+                    if (shouldReconnect) {
                         reconnectAttempts++;
+                        console.log(`[WebSocket] Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
                         reconnectTimeout = setTimeout(connectWebSocket, reconnectDelay);
+                    } else if (reconnectAttempts >= maxReconnectAttempts) {
+                        console.log('[WebSocket] Max reconnection attempts reached');
                     }
                 };
 
@@ -170,7 +227,7 @@ export default function GamePage() {
             if (reconnectTimeout) clearTimeout(reconnectTimeout);
             if (socket) socket.close(1000, 'Component unmounting');
         };
-    }, [gameId]);
+    }, [gameId, isJoined, isOwner]); // Removed gameState to prevent infinite reconnection loop
 
     const handleJoin = async () => {
         if (!session?.user?.email) {
@@ -190,12 +247,14 @@ export default function GamePage() {
 
             if (data.game) {
                 setGameState(data.game);
+                // WebSocket will automatically connect when gameState updates and isJoined becomes true
             } else {
                 // Reload
                 const reloadRes = await fetch(`/api/games/${gameId}`);
                 if (reloadRes.ok) {
                     const reloadData = await reloadRes.json();
                     setGameState(reloadData);
+                    // WebSocket will automatically connect when gameState updates and isJoined becomes true
                 }
             }
         } catch (e) {
@@ -277,6 +336,23 @@ export default function GamePage() {
     };
 
     const handleNextRound = async () => {
+        // Check if game has ended before trying to start next round
+        if (gameState) {
+            const numPlayers = gameState.players?.length || 0;
+            const maxCards = Math.floor(DECK_SIZE / numPlayers);
+            const finalRoundNumber = maxCards * 2 - 1;
+            const completedRounds = gameState.rounds?.filter((r: any) => r.state === 'COMPLETED') || [];
+            const lastCompletedRound = completedRounds.length > 0 
+                ? Math.max(...completedRounds.map((r: any) => r.index))
+                : 0;
+            const isGameEnded = lastCompletedRound >= finalRoundNumber;
+            
+            if (isGameEnded) {
+                // Game has ended - don't try to start next round
+                return;
+            }
+        }
+        
         setLoading(true);
         try {
             const res = await fetch(`/api/games/${gameId}/rounds`, {
@@ -288,7 +364,17 @@ export default function GamePage() {
             if (res.ok && data.game) {
                 setGameState(data.game);
             } else {
-                alert(data.error || 'Failed to start next round');
+                // Don't show alert for "Game has ended" error - it's expected
+                if (data.error && data.error.includes('Game has ended')) {
+                    // Just update the game state to refresh the UI
+                    const reloadRes = await fetch(`/api/games/${gameId}`);
+                    if (reloadRes.ok) {
+                        const reloadData = await reloadRes.json();
+                        setGameState(reloadData);
+                    }
+                } else {
+                    alert(data.error || 'Failed to start next round');
+                }
             }
         } catch (e) {
             console.error('Error starting next round:', e);
@@ -320,15 +406,11 @@ export default function GamePage() {
     }
 
     // Determine Mode
-    const players = gameState.players || [];
-    const isOwner = session?.user?.email === gameState.ownerEmail;
-    const isJoined = session?.user?.email ? players.some((p: Player) => p.email === session.user.email) : false;
-    
     // Check if game has strictly started (Round > 0)
     const mode = (gameState.currentRoundIndex > 0) ? 'PLAYING' : 'LOBBY';
 
     return (
-        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans">
+        <div className="h-[100dvh] w-full bg-[var(--background)] text-[var(--foreground)] font-sans flex flex-col overflow-hidden">
             {mode === 'LOBBY' ? (
                 <GameSetup 
                     gameId={gameId} 
@@ -401,6 +483,11 @@ function SettingsModal({
     }, [isOpen, currentPlayer]);
 
     const handleSave = async () => {
+        // Prevent name changes after game has started
+        if (gameState.currentRoundIndex > 0) {
+            return;
+        }
+        
         if (!name.trim() || !currentUserEmail) return;
         
         setSaving(true);
@@ -427,35 +514,57 @@ function SettingsModal({
         }
     };
 
+    const isGameStarted = gameState.currentRoundIndex > 0;
+
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] w-full max-w-sm p-6 space-y-4">
                 <h3 className="text-xl font-bold">Change Your Name</h3>
-                <input
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-lg outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
-                    placeholder="Your name"
-                />
-                <div className="flex gap-3">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 bg-[var(--secondary)] text-[var(--foreground)] py-3 rounded-xl font-medium"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={!name.trim() || saving}
-                        className="flex-1 bg-[var(--primary)] text-white py-3 rounded-xl font-bold disabled:opacity-50"
-                    >
-                        {saving ? "Saving..." : "Save"}
-                    </button>
-                </div>
+                {isGameStarted ? (
+                    <div className="p-4 bg-[var(--secondary)] rounded-xl border border-[var(--border)]">
+                        <p className="text-sm text-[var(--muted-foreground)]">
+                            Name changes are not allowed after the game has started.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <input
+                            autoFocus
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                            className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-lg outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                            placeholder="Your name"
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-[var(--secondary)] text-[var(--foreground)] py-3 rounded-xl font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={!name.trim() || saving}
+                                className="flex-1 bg-[var(--primary)] text-white py-3 rounded-xl font-bold disabled:opacity-50"
+                            >
+                                {saving ? "Saving..." : "Save"}
+                            </button>
+                        </div>
+                    </>
+                )}
+                {isGameStarted && (
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onClose}
+                            className="flex-1 bg-[var(--secondary)] text-[var(--foreground)] py-3 rounded-xl font-medium"
+                        >
+                            Close
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
