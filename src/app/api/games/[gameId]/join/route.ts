@@ -5,6 +5,7 @@ import { setGame, getGame, getSheetIdFromTempId } from "@/lib/store";
 import { google } from "googleapis";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
+import { JWT } from "next-auth/jwt";
 
 export async function POST(
     req: NextRequest,
@@ -117,7 +118,7 @@ export async function POST(
  * This function runs asynchronously and does not block the response.
  */
 function syncPlayerToSheetAsync(
-    token: { id?: string; name?: string | null; email?: string | null; accessToken?: unknown; refreshToken?: unknown },
+    token: JWT,
     sheetId: string,
     ownerEmail?: string
 ) {
