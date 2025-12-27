@@ -24,6 +24,7 @@ console.log('=== ScoreJudge Game Flow Test ===\n');
 
 // Test 1: Create game state
 console.log('1. Creating initial game state...');
+const now = Date.now();
 const initialGame = {
     id: testGameId,
     name: 'Test Game - 4 Players',
@@ -32,7 +33,8 @@ const initialGame = {
     currentRoundIndex: 0,
     ownerEmail: testPlayers[0].email,
     operatorEmail: testPlayers[0].email,
-    lastUpdated: Date.now()
+    createdAt: now,
+    lastUpdated: now
 };
 setGame(testGameId, initialGame);
 console.log('✓ Game created with 1 player\n');
