@@ -151,6 +151,11 @@ app.prepare().then(() => {
                 return { valid: false, error: 'Invalid or missing session token' };
             }
 
+            // For discovery channel, only validate authentication (no game check needed)
+            if (gameId === 'discovery') {
+                return { valid: true, email: token.email as string };
+            }
+
             // Try to find game with retry logic to handle race conditions
             // For temp IDs, the game might be created asynchronously
             // Increase retries and delay for temp IDs since they're created in API routes
@@ -194,10 +199,36 @@ app.prepare().then(() => {
 
     // Client tracking
     const clients = new Map<WebSocket, { gameId: string; email: string }>(); // ws -> {gameId, email}
+    const discoveryClients = new Set<WebSocket>(); // Clients listening for discovery updates
 
     wss.on('connection', async (ws, req) => {
         const { query } = parse(req.url || '', true);
         const gameId = query.gameId as string;
+        const channel = query.channel as string; // 'discovery' for discovery channel
+
+        // Handle discovery channel
+        if (channel === 'discovery') {
+            // Validate authentication
+            const authResult = await validateWebSocketAuth(req, 'discovery');
+            if (!authResult.valid) {
+                ws.send(JSON.stringify({ type: 'ERROR', message: authResult.error || 'Authentication failed' }));
+                ws.close(1008, authResult.error || 'Authentication failed');
+                return;
+            }
+
+            console.log(`Discovery client connected (user: ${authResult.email})`);
+            discoveryClients.add(ws);
+
+            ws.on('close', () => {
+                discoveryClients.delete(ws);
+            });
+
+            ws.on('message', (message) => {
+                console.log('Discovery client message:', message.toString());
+            });
+
+            return; // Don't process as game connection
+        }
 
         if (!gameId) {
             ws.close(1008, 'Missing gameId');
@@ -318,6 +349,34 @@ app.prepare().then(() => {
             }
         }
         console.log(`[Broadcast] Completed: gameId=${gameId}, actualGameId=${actualGameId}, sentTo=${sentCount} clients`);
+    };
+
+    // Broadcast discovery updates (new games, game updates that affect discoverability)
+    (global as any).broadcastDiscoveryUpdate = (updateType: 'GAME_CREATED' | 'GAME_UPDATED' | 'GAME_DELETED', game: GameState) => {
+        const message = JSON.stringify({ 
+            type: 'DISCOVERY_UPDATE', 
+            updateType,
+            game: {
+                id: game.id,
+                name: game.name,
+                ownerEmail: game.ownerEmail,
+                playerCount: game.players?.length || 0,
+                currentRoundIndex: game.currentRoundIndex,
+            }
+        });
+        
+        let sentCount = 0;
+        for (const client of discoveryClients) {
+            if (client.readyState === WebSocket.OPEN) {
+                try {
+                    client.send(message);
+                    sentCount++;
+                } catch (e) {
+                    console.error(`[Discovery Broadcast] Error sending to client:`, e);
+                }
+            }
+        }
+        console.log(`[Discovery Broadcast] Sent ${updateType} update to ${sentCount} clients`);
     };
 
     server.on('upgrade', (req, socket, head) => {

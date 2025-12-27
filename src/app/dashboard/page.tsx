@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle } from "lucide-react";
+import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle, Users, LogIn } from "lucide-react";
 
 interface GameFile {
     id: string;
@@ -20,21 +20,42 @@ interface GameState {
     players?: Array<any>;
 }
 
+interface DiscoverableGame {
+    id: string;
+    name: string;
+    ownerEmail: string;
+    playerCount: number;
+    createdAt?: number;
+}
+
+import { DECK_SIZE } from "@/lib/config";
+
 // Helper to calculate final round number
 function getFinalRoundNumber(numPlayers: number): number {
     if (!numPlayers) return 12; // Default fallback
-    const maxCards = Math.floor(52 / numPlayers);
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
     return maxCards * 2 - 1;
 }
 
 export default function Dashboard() {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const router = useRouter();
     const [games, setGames] = useState<GameFile[]>([]);
     const [loading, setLoading] = useState(true);
     const [gameStates, setGameStates] = useState<Record<string, GameState>>({});
     const [deleting, setDeleting] = useState<string | null>(null);
+    const [discoverableGames, setDiscoverableGames] = useState<DiscoverableGame[]>([]);
+    const [loadingDiscoverable, setLoadingDiscoverable] = useState(true);
 
+    // Redirect to sign in if not authenticated
+    useEffect(() => {
+        if (status === 'unauthenticated' || (status !== 'loading' && !session)) {
+            const callbackUrl = encodeURIComponent('/dashboard');
+            router.replace(`/api/auth/signin?callbackUrl=${callbackUrl}`);
+        }
+    }, [session, status, router]);
+
+    // Fetch games on mount
     useEffect(() => {
         if (session) {
             fetch("/api/games")
@@ -63,7 +84,155 @@ export default function Dashboard() {
                     console.error(err);
                     setLoading(false);
                 });
+
+            // Fetch discoverable games
+            fetch("/api/games/discover")
+                .then((res) => {
+                    if (!res.ok) {
+                        throw new Error('Failed to fetch discoverable games');
+                    }
+                    return res.json();
+                })
+                .then((data: DiscoverableGame[]) => {
+                    if (Array.isArray(data)) {
+                        setDiscoverableGames(data);
+                    }
+                    setLoadingDiscoverable(false);
+                })
+                .catch((err) => {
+                    console.error('Error fetching discoverable games:', err);
+                    setLoadingDiscoverable(false);
+                });
         }
+    }, [session]);
+
+    // WebSocket connection for discovery updates
+    useEffect(() => {
+        if (!session) return;
+
+        const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${typeof window !== 'undefined' ? window.location.host : 'localhost:3000'}/ws?channel=discovery`;
+        
+        let socket: WebSocket | null = null;
+        let reconnectTimeout: NodeJS.Timeout | null = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 3000; // 3 seconds
+
+        const connect = () => {
+            try {
+                socket = new WebSocket(wsUrl);
+
+                socket.onopen = () => {
+                    console.log('[Discovery] WebSocket connected');
+                    reconnectAttempts = 0; // Reset on successful connection
+                };
+
+                socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        // Check for error messages from server
+                        if (data.type === 'ERROR') {
+                            console.error('[Discovery] WebSocket server error:', data.message);
+                            return;
+                        }
+                        
+                        if (data.type === 'DISCOVERY_UPDATE') {
+                            console.log('[Discovery] Received update:', data);
+                            
+                            // Handle deletion updates immediately (remove from local state)
+                            if (data.updateType === 'GAME_DELETED' && data.game) {
+                                setDiscoverableGames((prev) => 
+                                    prev.filter((g) => g.id !== data.game.id)
+                                );
+                            } else {
+                                // For creation/update, refresh the full list to get sorted order
+                                fetch("/api/games/discover")
+                                    .then((res) => {
+                                        if (!res.ok) {
+                                            throw new Error('Failed to fetch discoverable games');
+                                        }
+                                        return res.json();
+                                    })
+                                    .then((data: DiscoverableGame[]) => {
+                                        if (Array.isArray(data)) {
+                                            setDiscoverableGames(data);
+                                        }
+                                    })
+                                    .catch((err) => {
+                                        console.error('Error fetching discoverable games:', err);
+                                    });
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing discovery WebSocket message:', e);
+                    }
+                };
+
+                socket.onerror = (event) => {
+                    // WebSocket error events don't provide detailed information
+                    // Log at debug level instead of error level to avoid console noise
+                    // The onclose handler will provide more useful information
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('[Discovery] WebSocket error event (connection issue, will attempt reconnect):', {
+                            type: event.type,
+                            readyState: event.target instanceof WebSocket ? event.target.readyState : 'unknown',
+                        });
+                    }
+                };
+
+                socket.onclose = (event) => {
+                    const wasClean = event.wasClean;
+                    const code = event.code;
+                    const reason = event.reason || 'No reason provided';
+                    
+                    // Log closure details
+                    if (wasClean) {
+                        console.log('[Discovery] WebSocket closed cleanly');
+                    } else {
+                        console.log('[Discovery] WebSocket closed unexpectedly', {
+                            code,
+                            reason,
+                        });
+                    }
+
+                    // Don't reconnect for:
+                    // - Clean close (1000)
+                    // - Policy violation (1008) - typically means authentication failure
+                    // - Max reconnection attempts reached
+                    const isPolicyViolation = code === 1008;
+                    const shouldReconnect = !wasClean && 
+                                          !isPolicyViolation &&
+                                          reconnectAttempts < maxReconnectAttempts;
+                    
+                    if (isPolicyViolation) {
+                        console.log('[Discovery] Policy violation detected, will not reconnect. Please refresh the page.');
+                    } else if (shouldReconnect) {
+                        reconnectAttempts++;
+                        console.log(`[Discovery] Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                        reconnectTimeout = setTimeout(() => {
+                            connect();
+                        }, reconnectDelay);
+                    } else if (reconnectAttempts >= maxReconnectAttempts) {
+                        console.log('[Discovery] Max reconnection attempts reached. WebSocket will not reconnect.');
+                    }
+                };
+            } catch (error) {
+                console.error('[Discovery] Failed to create WebSocket:', error);
+            }
+        };
+
+        connect();
+
+        return () => {
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+            }
+            if (socket) {
+                socket.close();
+            }
+        };
     }, [session]);
 
     const handleDelete = async (gameId: string, e: React.MouseEvent) => {
@@ -161,86 +330,149 @@ export default function Dashboard() {
         };
     };
 
-    if (!session) return <div className="p-10 text-center">Please sign in.</div>;
+    // Show loading state while checking authentication or redirecting
+    if (status === 'loading' || !session) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="animate-spin text-muted-foreground" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-6 max-w-4xl mx-auto space-y-8">
             <header className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                        My Games
+                        Dashboard
                     </h1>
-                    <p className="text-muted-foreground">Manage your ScoreJudge sessions.</p>
+                    <p className="text-muted-foreground">Discover and manage your ScoreJudge sessions.</p>
                 </div>
                 <Link href="/create" className="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition">
                     <Plus size={18} /> New Game
                 </Link>
             </header>
 
-            {loading ? (
-                <div className="flex justify-center py-20">
-                    <Loader2 className="animate-spin text-muted-foreground" size={32} />
+            {/* Discover Games Section */}
+            <div className="space-y-4">
+                <div>
+                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-600">
+                        Discover Games
+                    </h2>
+                    <p className="text-muted-foreground text-sm">Join games that haven't started yet</p>
                 </div>
-            ) : (
-                <div className="grid gap-4">
-                    {games.length === 0 ? (
-                        <div className="text-center py-20 glass rounded-xl">
-                            <p className="text-muted-foreground">No games found. Start one now!</p>
-                        </div>
-                    ) : (
-                        games.map((g) => {
-                            const showDelete = canDelete(g.id);
-                            const isDeleting = deleting === g.id;
-                            const status = getGameStatus(g.id);
-                            const StatusIcon = status.icon;
-                            
-                            return (
-                                <div key={g.id} className="glass p-5 rounded-xl flex items-center justify-between group hover:scale-[1.01] transition-all">
-                                    <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-1">
-                                                <h3 className="font-semibold text-lg">{g.name.replace('ScoreJudge - ', '')}</h3>
-                                                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${status.bg} ${status.color} ${status.border || ''}`}>
-                                                    <StatusIcon size={12} />
-                                                    {status.label}
+
+                {loadingDiscoverable ? (
+                    <div className="flex justify-center py-10">
+                        <Loader2 className="animate-spin text-muted-foreground" size={24} />
+                    </div>
+                ) : discoverableGames.length === 0 ? (
+                    <div className="text-center py-10 glass rounded-xl">
+                        <p className="text-muted-foreground">No joinable games available. Create a new game to get started!</p>
+                    </div>
+                ) : (
+                    <div className="grid gap-4">
+                        {discoverableGames.map((game) => (
+                            <div key={game.id} className="glass p-5 rounded-xl flex items-center justify-between group hover:scale-[1.01] transition-all">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <h3 className="font-semibold text-lg">{game.name}</h3>
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                            <Users size={12} />
+                                            {game.playerCount}/12 players
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Owner: {game.ownerEmail}
+                                    </div>
+                                </div>
+                                <Link
+                                    href={`/game/${game.id}`}
+                                    className="ml-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg font-medium flex items-center gap-2 hover:bg-[var(--primary)]/90 transition-all active:scale-95"
+                                >
+                                    <LogIn size={16} />
+                                    Join
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* My Games Section */}
+            <div className="space-y-4">
+                <div>
+                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                        My Games
+                    </h2>
+                    <p className="text-muted-foreground text-sm">Games you've created or joined</p>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center py-20">
+                        <Loader2 className="animate-spin text-muted-foreground" size={32} />
+                    </div>
+                ) : (
+                    <div className="grid gap-4">
+                        {games.length === 0 ? (
+                            <div className="text-center py-20 glass rounded-xl">
+                                <p className="text-muted-foreground">No games found. Start one now!</p>
+                            </div>
+                        ) : (
+                            games.map((g) => {
+                                const showDelete = canDelete(g.id);
+                                const isDeleting = deleting === g.id;
+                                const status = getGameStatus(g.id);
+                                const StatusIcon = status.icon;
+                                
+                                return (
+                                    <div key={g.id} className="glass p-5 rounded-xl flex items-center justify-between group hover:scale-[1.01] transition-all">
+                                        <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-between">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-1">
+                                                    <h3 className="font-semibold text-lg">{g.name.replace('ScoreJudge - ', '')}</h3>
+                                                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${status.bg} ${status.color} ${status.border || ''}`}>
+                                                        <StatusIcon size={12} />
+                                                        {status.label}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock size={12} />
+                                                        {new Date(g.createdTime).toLocaleDateString()}
+                                                    </span>
+                                                    {status.label !== 'Completed' && status.label !== 'Not Started' && status.label !== 'Loading...' && (
+                                                        <span className="text-indigo-400 font-medium flex items-center gap-1">
+                                                            Resume Game <ArrowRight size={12} />
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                                <span className="flex items-center gap-1">
-                                                    <Clock size={12} />
-                                                    {new Date(g.createdTime).toLocaleDateString()}
-                                                </span>
-                                                {status.label !== 'Completed' && status.label !== 'Not Started' && status.label !== 'Loading...' && (
-                                                    <span className="text-indigo-400 font-medium flex items-center gap-1">
-                                                        Resume Game <ArrowRight size={12} />
-                                                    </span>
-                                                )}
+                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity mr-4">
+                                                <ArrowRight className="text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
                                             </div>
-                                        </div>
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity mr-4">
-                                            <ArrowRight className="text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
-                                        </div>
-                                    </Link>
-                                    {showDelete && (
-                                        <button
-                                            onClick={(e) => handleDelete(g.id, e)}
-                                            disabled={isDeleting}
-                                            className="ml-2 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title="Delete game (only for games that haven't started)"
-                                        >
-                                            {isDeleting ? (
-                                                <Loader2 className="animate-spin w-5 h-5" />
-                                            ) : (
-                                                <Trash2 className="w-5 h-5" />
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-            )}
+                                        </Link>
+                                        {showDelete && (
+                                            <button
+                                                onClick={(e) => handleDelete(g.id, e)}
+                                                disabled={isDeleting}
+                                                className="ml-2 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title="Delete game (only for games that haven't started)"
+                                            >
+                                                {isDeleting ? (
+                                                    <Loader2 className="animate-spin w-5 h-5" />
+                                                ) : (
+                                                    <Trash2 className="w-5 h-5" />
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

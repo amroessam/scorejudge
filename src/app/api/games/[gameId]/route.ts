@@ -187,10 +187,16 @@ export async function DELETE(
             }, { status: 400 });
         }
 
-        // 4. Remove from memory immediately
+        // 4. Broadcast discovery update BEFORE removing from memory
+        // This allows discovery clients to receive the deletion notification
+        if ((global as any).broadcastDiscoveryUpdate) {
+            (global as any).broadcastDiscoveryUpdate('GAME_DELETED', game);
+        }
+
+        // 5. Remove from memory immediately
         removeGame(gameId);
 
-        // 5. Delete from Google Drive (fire-and-forget)
+        // 6. Delete from Google Drive (fire-and-forget)
         // Don't await - return immediately, deletion happens in background
         (async () => {
             try {
