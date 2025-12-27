@@ -76,80 +76,8 @@ export async function POST(
         }, { status: 400 });
     }
 
-    // 4. Add to Sheet and share with player (if Google Sheets is available and not temp ID)
-    if (!gameId.startsWith('temp_')) {
-        let sheets: any = null;
-        let drive: any = null;
-        try {
-            // Use owner's auth to share the sheet and add player
-            // First, get owner's auth token - we need to fetch it from the game owner
-            // For now, try with current user's auth - if they're the owner, it will work
-            // If not, we'll need to handle this differently (store owner's refresh token)
-            const auth = getGoogleFromToken(token);
-            sheets = google.sheets({ version: 'v4', auth });
-            drive = google.drive({ version: 'v3', auth });
-            
-            // Try to add player to sheet
-            try {
-                await sheets.spreadsheets.values.append({
-                    spreadsheetId: actualGameId,
-                    range: 'Players!A:C',
-                    valueInputOption: 'USER_ENTERED',
-                    requestBody: {
-                        values: [[token.id, token.name, token.email]]
-                    }
-                });
-            } catch (sheetError: any) {
-                // If we can't write, try to share the sheet with the player first
-                // This might fail if current user is not the owner, but we'll try
-                if (token.email) {
-                    try {
-                        await drive.permissions.create({
-                            fileId: actualGameId,
-                            requestBody: {
-                                role: 'writer',
-                                type: 'user',
-                                emailAddress: token.email,
-                            },
-                            sendNotificationEmail: false,
-                        });
-                        // Retry adding player after sharing
-                        await sheets.spreadsheets.values.append({
-                            spreadsheetId: actualGameId,
-                            range: 'Players!A:C',
-                            valueInputOption: 'USER_ENTERED',
-                            requestBody: {
-                                values: [[token.id, token.name, token.email]]
-                            }
-                        });
-                    } catch (shareError: any) {
-                        console.error("Failed to share sheet with player or add to sheet:", shareError);
-                        // Continue - game will work in memory
-                    }
-                }
-            }
-            
-            // Share sheet with new player if not already shared (fire-and-forget)
-            if (token.email && token.email !== game.ownerEmail) {
-                drive.permissions.create({
-                    fileId: actualGameId,
-                    requestBody: {
-                        role: 'writer',
-                        type: 'user',
-                        emailAddress: token.email,
-                    },
-                    sendNotificationEmail: false,
-                }).catch((e: any) => {
-                    console.error("Failed to share sheet with new player (continuing anyway):", e);
-                });
-            }
-        } catch (e: any) {
-            console.error("Failed to add player to sheet (continuing anyway):", e);
-            // Continue even if sheet update fails - game will work in memory
-        }
-    }
-
-    // 5. Update Memory + Broadcast
+    // 4. Update Memory first (fast path - this is what makes the response quick)
+    // Google Sheets operations happen in background after we return
     const newPlayer = {
         id: token.id as string,
         name: token.name || 'Unknown',
@@ -175,5 +103,87 @@ export async function POST(
         }
     }
 
+    // 5. Fire-and-forget: Add to Google Sheet in background (non-blocking)
+    // This runs after we return the response, so the user sees immediate feedback
+    if (!gameId.startsWith('temp_')) {
+        syncPlayerToSheetAsync(token, actualGameId, game.ownerEmail);
+    }
+
     return NextResponse.json({ success: true, game });
+}
+
+/**
+ * Syncs player to Google Sheet in background (fire-and-forget).
+ * This function runs asynchronously and does not block the response.
+ */
+function syncPlayerToSheetAsync(
+    token: { id?: string; name?: string | null; email?: string | null; accessToken?: unknown; refreshToken?: unknown },
+    sheetId: string,
+    ownerEmail?: string
+) {
+    // Run in background - no await, just fire and forget
+    (async () => {
+        try {
+            const auth = getGoogleFromToken(token);
+            const sheets = google.sheets({ version: 'v4', auth });
+            const drive = google.drive({ version: 'v3', auth });
+            
+            // Try to add player to sheet
+            try {
+                await sheets.spreadsheets.values.append({
+                    spreadsheetId: sheetId,
+                    range: 'Players!A:C',
+                    valueInputOption: 'USER_ENTERED',
+                    requestBody: {
+                        values: [[token.id, token.name, token.email]]
+                    }
+                });
+            } catch (sheetError: any) {
+                // If we can't write, try to share the sheet with the player first
+                if (token.email) {
+                    try {
+                        await drive.permissions.create({
+                            fileId: sheetId,
+                            requestBody: {
+                                role: 'writer',
+                                type: 'user',
+                                emailAddress: token.email,
+                            },
+                            sendNotificationEmail: false,
+                        });
+                        // Retry adding player after sharing
+                        await sheets.spreadsheets.values.append({
+                            spreadsheetId: sheetId,
+                            range: 'Players!A:C',
+                            valueInputOption: 'USER_ENTERED',
+                            requestBody: {
+                                values: [[token.id, token.name, token.email]]
+                            }
+                        });
+                    } catch (shareError: any) {
+                        console.error("[Background] Failed to share sheet with player or add to sheet:", shareError);
+                    }
+                }
+            }
+            
+            // Share sheet with new player if not already shared
+            if (token.email && token.email !== ownerEmail) {
+                try {
+                    await drive.permissions.create({
+                        fileId: sheetId,
+                        requestBody: {
+                            role: 'writer',
+                            type: 'user',
+                            emailAddress: token.email,
+                        },
+                        sendNotificationEmail: false,
+                    });
+                } catch (e: any) {
+                    console.error("[Background] Failed to share sheet with new player:", e);
+                }
+            }
+        } catch (e: any) {
+            console.error("[Background] Failed to sync player to sheet:", e);
+        }
+    })();
 }
