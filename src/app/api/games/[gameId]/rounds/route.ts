@@ -152,20 +152,17 @@ export async function POST(
                     });
                 }
 
-                // Write plan to 'Rounds' tab (if Google Sheets is available and not temp ID)
+                // Write plan to 'Rounds' tab (fire-and-forget - non-blocking)
                 if (sheets && !actualGameId.startsWith('temp_')) {
-                    try {
-                        const values = game.rounds.map(r => [r.index, r.cards, r.trump, 'BIDDING', '']);
-                        await sheets.spreadsheets.values.update({
-                            spreadsheetId: actualGameId,
-                            range: 'Rounds!A2:E' + (values.length + 1),
-                            valueInputOption: 'USER_ENTERED',
-                            requestBody: { values }
-                        });
-                    } catch (e) {
-                        console.error("Failed to write rounds to sheet:", e);
-                        // Continue - game state is updated in memory
-                    }
+                    const values = game.rounds.map(r => [r.index, r.cards, r.trump, 'BIDDING', '']);
+                    sheets.spreadsheets.values.update({
+                        spreadsheetId: actualGameId,
+                        range: 'Rounds!A2:E' + (values.length + 1),
+                        valueInputOption: 'USER_ENTERED',
+                        requestBody: { values }
+                    }).catch((e: any) => {
+                        console.error("Failed to write rounds to sheet (continuing anyway):", e);
+                    });
                 }
             } else if (game.currentRoundIndex === 0) {
                 // Rounds exist but game hasn't started - find first non-completed round or start at round 1
