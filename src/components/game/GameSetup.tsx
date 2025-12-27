@@ -47,6 +47,7 @@ function SortablePlayerItem({
     firstDealerEmail, 
     onToggleDealer, 
     onNameUpdate,
+    isGameStarted,
 }: { 
     player: Player, 
     isOwner: boolean, 
@@ -54,7 +55,8 @@ function SortablePlayerItem({
     firstDealerEmail?: string,
     onToggleDealer: (email: string) => void,
     onNameUpdate: (name: string) => void,
-    onDelete: (email: string) => void
+    onDelete: (email: string) => void,
+    isGameStarted: boolean,
 }) {
     const {
         attributes,
@@ -116,12 +118,20 @@ function SortablePlayerItem({
                 className="relative"
                 onClick={() => isOwner && onToggleDealer(player.email)}
             >
-                <div className={`
-                    w-10 h-10 rounded-full flex items-center justify-center
-                    ${isFirstDealer ? 'bg-[var(--primary)] text-white' : 'bg-[var(--secondary)] text-[var(--muted-foreground)]'}
-                `}>
-                    <User size={20} />
-                </div>
+                {player.image ? (
+                    <img 
+                        src={player.image} 
+                        alt={player.name}
+                        className={`w-10 h-10 rounded-full object-cover ${isFirstDealer ? 'ring-2 ring-[var(--primary)]' : ''}`}
+                    />
+                ) : (
+                    <div className={`
+                        w-10 h-10 rounded-full flex items-center justify-center
+                        ${isFirstDealer ? 'bg-[var(--primary)] text-white' : 'bg-[var(--secondary)] text-[var(--muted-foreground)]'}
+                    `}>
+                        {isFirstDealer ? <Crown size={20} fill="currentColor" /> : <User size={20} />}
+                    </div>
+                )}
                 {isFirstDealer && (
                     <div className="absolute -top-1 -right-1 bg-yellow-500 text-black p-0.5 rounded-full shadow-sm">
                         <Crown size={12} fill="currentColor" />
@@ -142,8 +152,8 @@ function SortablePlayerItem({
                     />
                 ) : (
                     <div 
-                        onClick={() => isCurrentUser && setIsEditing(true)}
-                        className={`font-medium text-lg truncate ${isCurrentUser ? 'cursor-pointer hover:text-[var(--primary)] transition-colors' : ''}`}
+                        onClick={() => isCurrentUser && !isGameStarted && setIsEditing(true)}
+                        className={`font-medium text-lg truncate ${isCurrentUser && !isGameStarted ? 'cursor-pointer hover:text-[var(--primary)] transition-colors' : ''}`}
                     >
                         {player.name} {isCurrentUser && <span className="text-xs text-[var(--muted-foreground)] font-normal">(You)</span>}
                     </div>
@@ -206,6 +216,11 @@ export function GameSetup({
 
     const handleNameUpdate = async (name: string) => {
         if (!currentUserEmail) return;
+        
+        // Prevent name changes after game has started
+        if (gameState.currentRoundIndex > 0) {
+            return;
+        }
         
         // Optimistic update
         const newPlayers = gameState.players.map((p: Player) => 
@@ -304,14 +319,14 @@ export function GameSetup({
     const canStart = players.length >= 3;
 
     return (
-        <div className="flex flex-col h-full space-y-6 pb-24 px-4">
+        <div className="flex flex-col h-full overflow-hidden bg-[var(--background)]">
             {/* Header */}
-            <div className="text-center space-y-2 pt-6">
+            <div className="text-center space-y-2 pt-6 pb-4 px-4 shrink-0 z-10 bg-[var(--background)]">
                 <h2 className="text-3xl font-bold tracking-tight">{gameState.name}</h2>
                 <div className="flex items-center justify-center gap-2">
                     <button 
                         onClick={handleShare}
-                        className="bg-[var(--secondary)] text-[var(--foreground)] px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 active:scale-95 transition-transform"
+                        className="bg-[var(--secondary)] text-[var(--foreground)] px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 active:scale-95 transition-transform touch-manipulation"
                     >
                         {copied ? <Check size={16} className="text-green-500" /> : <Share2 size={16} />}
                         {copied ? "Link Copied" : "Invite Players"}
@@ -320,7 +335,7 @@ export function GameSetup({
             </div>
 
             {/* Player List */}
-            <div className="flex-1">
+            <div className="flex-1 overflow-y-auto px-4 pb-4 overscroll-contain">
                 <div className="flex items-center justify-between mb-2 text-sm text-[var(--muted-foreground)]">
                     <span>{players.length} Players</span>
                     {isOwner && <span>Drag to order</span>}
@@ -345,7 +360,8 @@ export function GameSetup({
                                     firstDealerEmail={gameState.firstDealerEmail}
                                     onToggleDealer={handleToggleDealer}
                                     onNameUpdate={handleNameUpdate}
-                                    onDelete={() => {}} 
+                                    onDelete={() => {}}
+                                    isGameStarted={gameState.currentRoundIndex > 0}
                                 />
                             ))}
                         </div>
@@ -359,14 +375,14 @@ export function GameSetup({
                 )}
             </div>
 
-            {/* Bottom Bar (Sticky) */}
-            <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[var(--background)] to-transparent pt-12 safe-pb">
+            {/* Bottom Bar */}
+            <div className="shrink-0 bg-[var(--background)] border-t border-[var(--border)] pt-4 safe-pb z-10">
                 <div className="px-4 pb-4">
                     {isOwner ? (
                         <button
                             onClick={handleStartGame}
                             disabled={!canStart || starting}
-                            className="w-full bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
+                            className="w-full bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform touch-manipulation"
                         >
                             {starting ? <Loader2 className="animate-spin" /> : "Start Game"}
                         </button>
@@ -374,7 +390,7 @@ export function GameSetup({
                         <button
                             onClick={handleJoinClick}
                             disabled={joining || players.length >= 12}
-                            className="w-full bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-transform"
+                            className="w-full bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-transform touch-manipulation"
                         >
                             {joining ? <Loader2 className="animate-spin" /> : (
                                 <>
@@ -383,7 +399,7 @@ export function GameSetup({
                             )}
                         </button>
                     ) : (
-                        <div className="text-center text-[var(--muted-foreground)] py-2 font-medium bg-[var(--background)]/80 backdrop-blur rounded-xl border border-[var(--border)]">
+                        <div className="text-center text-[var(--muted-foreground)] py-2 font-medium bg-[var(--secondary)]/50 rounded-xl border border-[var(--border)]">
                             Waiting for host to start...
                         </div>
                     )}

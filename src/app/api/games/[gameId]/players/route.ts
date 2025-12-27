@@ -51,6 +51,13 @@ export async function PATCH(
         return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
 
+    // Check if game has started - name changes are only allowed before the game starts
+    if (game.currentRoundIndex > 0) {
+        return NextResponse.json({ 
+            error: "Name cannot be changed after the game has started" 
+        }, { status: 400 });
+    }
+
     // Update player
     const playerIndex = game.players.findIndex(p => p.email === token.email);
     if (playerIndex === -1) {

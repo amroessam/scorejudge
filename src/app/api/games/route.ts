@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
         const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
         // Initialize game state in memory immediately with temp ID
+        const now = Date.now();
         const initialGameState: GameState = {
             id: tempId,
             name,
@@ -71,13 +72,15 @@ export async function POST(req: NextRequest) {
                 email: token.email as string || '',
                 tricks: 0,
                 bid: 0,
-                score: 0
+                score: 0,
+                image: token.picture as string | undefined
             }],
             rounds: [],
             currentRoundIndex: 0,
             ownerEmail: token.email as string || '',
             operatorEmail: token.email as string || '',
-            lastUpdated: Date.now()
+            createdAt: now,
+            lastUpdated: now
         };
         setGame(tempId, initialGameState);
         console.log(`[API] Created game ${tempId} in memory. Owner: ${token.email}`);
@@ -114,6 +117,12 @@ export async function POST(req: NextRequest) {
                     console.log(`[API] Broadcasting game update: tempId=${tempGameId}, sheetId=${sheetId}`);
                     (global as any).broadcastGameUpdate(tempGameId, game);
                     (global as any).broadcastGameUpdate(sheetId, game);
+                }
+                
+                // Broadcast discovery update when game is created (only when it has real sheet ID)
+                if ((global as any).broadcastDiscoveryUpdate) {
+                    console.log(`[API] Broadcasting discovery update: game created, sheetId=${sheetId}`);
+                    (global as any).broadcastDiscoveryUpdate('GAME_CREATED', game);
                 }
             }
         );

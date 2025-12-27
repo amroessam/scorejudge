@@ -156,7 +156,8 @@ export async function POST(
         email: token.email || '',
         score: 0,
         bid: 0,
-        tricks: 0
+        tricks: 0,
+        image: token.picture as string | undefined
     };
     
     game.players.push(newPlayer);

@@ -9,6 +9,7 @@ export interface Player {
     tricks: number;
     bid: number;
     score: number;
+    image?: string; // Profile picture URL
 }
 
 export interface Round {
@@ -30,8 +31,9 @@ export interface GameState {
     operatorEmail?: string; // Defaults to ownerEmail if not set
     firstDealerEmail?: string; // Optional: specific starting dealer
 
-    // Cache control
-    lastUpdated: number;
+    // Timestamps
+    createdAt: number; // When the game was created
+    lastUpdated: number; // When the game was last updated
 }
 
 const globalForStore = globalThis as unknown as { gameStore: Map<string, GameState> };
@@ -50,6 +52,10 @@ export function getGame(id: string) {
 
 export function setGame(id: string, state: GameState) {
     games.set(id, state);
+    // Set createdAt if not already set (for new games)
+    if (!state.createdAt) {
+        state.createdAt = Date.now();
+    }
     state.lastUpdated = Date.now();
     return state;
 }
@@ -82,4 +88,8 @@ export function mapTempIdToSheetId(tempId: string, sheetId: string) {
 
 export function getSheetIdFromTempId(tempId: string): string | undefined {
     return tempIdMap.get(tempId);
+}
+
+export function getAllGames(): GameState[] {
+    return Array.from(games.values());
 }
