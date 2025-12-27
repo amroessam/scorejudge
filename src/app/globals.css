@@ -51,6 +51,19 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   -webkit-font-smoothing: antialiased;
+  
+  /* Mobile Viewport Locking */
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Prevent body scroll */
+  overscroll-behavior: none; /* Prevent bounce */
+  touch-action: pan-x pan-y;
+}
+
+html {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 /* Utilities */
