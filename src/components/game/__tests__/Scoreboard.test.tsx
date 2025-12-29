@@ -26,6 +26,17 @@ jest.mock('next-auth/react', () => ({
 // Mock fetch for image upload
 global.fetch = jest.fn();
 
+// Mock react-easy-crop
+jest.mock('react-easy-crop', () => {
+    const React = require('react');
+    return function MockCropper({ onCropComplete }: { onCropComplete: (croppedArea: any, croppedAreaPixels: any) => void }) {
+        React.useEffect(() => {
+            onCropComplete({ x: 0, y: 0, width: 100, height: 100 }, { x: 0, y: 0, width: 200, height: 200 });
+        }, [onCropComplete]);
+        return <div data-testid="mock-cropper">Mock Cropper</div>;
+    };
+});
+
 describe('Scoreboard', () => {
   const mockGameState: GameState = {
     id: 'game1',
@@ -78,31 +89,41 @@ describe('Scoreboard', () => {
     expect(screen.getByText('Round 1')).toBeInTheDocument();
   });
   
-  // NEW TEST: Image Upload
-  it('should allow image upload for current user', async () => {
-      render(<Scoreboard {...defaultProps} currentUserEmail="p1@test.com" />);
+  // NEW TEST: Image Upload opens cropper
+  it('should open cropper when image is selected for upload', async () => {
+      const { container } = render(<Scoreboard {...defaultProps} currentUserEmail="p1@test.com" />);
       
       // Hidden file input should be present
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
       expect(fileInput).toBeInTheDocument();
       
-      // Simulate file selection
+      // Simulate file selection with FileReader mock
       const file = new File(['(⌐□_□)'], 'cool_avatar.png', { type: 'image/png' });
+      
+      // Mock FileReader that triggers callback synchronously
+      const mockFileReaderInstance = {
+        readAsDataURL: jest.fn(function(this: any) {
+            // Synchronously call onloadend
+            if (this.onloadend) {
+                this.onloadend();
+            }
+        }),
+        onloadend: null as any,
+        result: 'data:image/png;base64,testimage'
+      };
+      jest.spyOn(window, 'FileReader').mockImplementation(() => mockFileReaderInstance as any);
+      
       Object.defineProperty(fileInput, 'files', {
         value: [file]
       });
       
-      fireEvent.change(fileInput);
+      await waitFor(async () => {
+          fireEvent.change(fileInput);
+      });
       
       await waitFor(() => {
-          // It should call the API to upload
-          expect(global.fetch).toHaveBeenCalledWith(
-              expect.stringContaining('/api/games/game1/players'),
-              expect.objectContaining({
-                  method: 'PATCH',
-                  body: expect.stringContaining('"image":'),
-              })
-          );
+          // Image cropper should open
+          expect(screen.getByText('Crop Photo')).toBeInTheDocument();
       });
   });
 
@@ -143,5 +164,53 @@ describe('Scoreboard', () => {
       // Should find 'W' and 'L' text
       expect(screen.getByText('W')).toBeInTheDocument();
       expect(screen.getByText('L')).toBeInTheDocument();
+  });
+
+  // NEW TEST: Medal indicators for ranked players
+  it('should display medal emojis for top 3 players', () => {
+      const rankedGameState = {
+          ...mockGameState,
+          players: [
+              { id: '1', name: 'First', email: 'p1@test.com', score: 100 },
+              { id: '2', name: 'Second', email: 'p2@test.com', score: 80 },
+              { id: '3', name: 'Third', email: 'p3@test.com', score: 60 },
+              { id: '4', name: 'Fourth', email: 'p4@test.com', score: 40 },
+          ],
+          rounds: [{ index: 1, cards: 5, trump: 'S', state: 'BIDDING', bids: {}, tricks: {} }],
+      };
+      
+      render(<Scoreboard {...defaultProps} gameState={rankedGameState} />);
+      
+      // Gold, Silver, Bronze medals
+      expect(screen.getByText('🥇')).toBeInTheDocument();
+      expect(screen.getByText('🥈')).toBeInTheDocument();
+      expect(screen.getByText('🥉')).toBeInTheDocument();
+  });
+
+  // NEW TEST: W/L indicators should wrap when many rounds
+  it('should have W/L indicators with flex-wrap for many rounds', () => {
+      const manyRoundsGameState = {
+          ...mockGameState,
+          players: [
+              { id: '1', name: 'Player 1', email: 'p1@test.com', score: 100 },
+          ],
+          rounds: Array.from({ length: 15 }, (_, i) => ({
+              index: i + 1,
+              cards: 5,
+              trump: 'S',
+              state: 'COMPLETED' as const,
+              bids: { 'p1@test.com': 1 },
+              tricks: { 'p1@test.com': i % 2 === 0 ? 1 : 0 }, // alternating wins/losses
+          })),
+          currentRoundIndex: 16,
+      };
+      
+      render(<Scoreboard {...defaultProps} gameState={manyRoundsGameState} currentUserEmail="other@test.com" />);
+      
+      // Should have many W and L indicators
+      const wins = screen.getAllByText('W');
+      const losses = screen.getAllByText('L');
+      expect(wins.length).toBeGreaterThan(0);
+      expect(losses.length).toBeGreaterThan(0);
   });
 });

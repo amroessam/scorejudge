@@ -29,6 +29,7 @@ import {
     Upload
 } from "lucide-react";
 import { Player } from "@/lib/store";
+import { ImageCropperOverlay } from "./ImageCropperOverlay";
 
 interface GameSetupProps {
     gameId: string;
@@ -213,6 +214,7 @@ export function GameSetup({
     const [copied, setCopied] = useState(false);
     const [starting, setStarting] = useState(false);
     const [joining, setJoining] = useState(false);
+    const [cropperImage, setCropperImage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // DnD Sensors
@@ -361,26 +363,31 @@ export function GameSetup({
         e.target.value = '';
 
         // Basic validation
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-            alert("Image is too large. Please choose an image under 5MB.");
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit for cropping
+            alert("Image is too large. Please choose an image under 10MB.");
             return;
         }
 
+        // Read the file and open cropper
         const reader = new FileReader();
-        reader.onloadend = async () => {
+        reader.onloadend = () => {
             const base64String = reader.result as string;
-            try {
-                await fetch(`/api/games/${gameId}/players`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64String })
-                });
-            } catch (err) {
-                console.error("Failed to upload image", err);
-                alert("Failed to update profile picture");
-            }
+            setCropperImage(base64String);
         };
         reader.readAsDataURL(file);
+    };
+
+    const handleCropComplete = async (croppedImageBase64: string) => {
+        try {
+            await fetch(`/api/games/${gameId}/players`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: croppedImageBase64 })
+            });
+        } catch (err) {
+            console.error("Failed to upload image", err);
+            alert("Failed to update profile picture");
+        }
     };
 
     const players = gameState.players || [];
@@ -486,6 +493,13 @@ export function GameSetup({
                     )}
                 </div>
             </div>
+
+            <ImageCropperOverlay
+                isOpen={!!cropperImage}
+                imageSrc={cropperImage || ''}
+                onClose={() => setCropperImage(null)}
+                onCropComplete={handleCropComplete}
+            />
         </div>
     );
 }

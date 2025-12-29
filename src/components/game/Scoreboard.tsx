@@ -16,6 +16,7 @@ import {
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
+import { ImageCropperOverlay } from "./ImageCropperOverlay";
 import { DECK_SIZE } from "@/lib/config";
 import confetti from "canvas-confetti";
 
@@ -61,6 +62,15 @@ function getFinalRoundNumber(numPlayers: number): number {
     return maxCards * 2 - 1;
 }
 
+// Helper to get position medal/emoji
+function getPositionIndicator(position: number, totalPlayers: number, isGameEnded: boolean): string | null {
+    if (position === 0) return '🥇'; // Gold - 1st place
+    if (position === 1) return '🥈'; // Silver - 2nd place
+    if (position === 2) return '🥉'; // Bronze - 3rd place
+    if (position === totalPlayers - 1 && isGameEnded) return '🏳️‍🌈'; // Last place (only when game ended)
+    return null;
+}
+
 export function Scoreboard({ 
     gameId, 
     gameState, 
@@ -74,6 +84,7 @@ export function Scoreboard({
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+    const [cropperImage, setCropperImage] = useState<string | null>(null);
     const { players, currentRoundIndex, rounds, firstDealerEmail } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
     
@@ -161,26 +172,31 @@ export function Scoreboard({
         e.target.value = '';
 
         // Basic validation
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-            alert("Image is too large. Please choose an image under 5MB.");
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit for cropping (will be reduced after)
+            alert("Image is too large. Please choose an image under 10MB.");
             return;
         }
 
+        // Read the file and open cropper
         const reader = new FileReader();
-        reader.onloadend = async () => {
+        reader.onloadend = () => {
             const base64String = reader.result as string;
-            try {
-                await fetch(`/api/games/${gameId}/players`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64String })
-                });
-            } catch (err) {
-                console.error("Failed to upload image", err);
-                alert("Failed to update profile picture");
-            }
+            setCropperImage(base64String);
         };
         reader.readAsDataURL(file);
+    };
+
+    const handleCropComplete = async (croppedImageBase64: string) => {
+        try {
+            await fetch(`/api/games/${gameId}/players`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: croppedImageBase64 })
+            });
+        } catch (err) {
+            console.error("Failed to upload image", err);
+            alert("Failed to update profile picture");
+        }
     };
 
     return (
@@ -260,11 +276,11 @@ export function Scoreboard({
 
             {/* Score List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 overscroll-contain">
-                {sortedPlayers.map((player: Player) => {
-                    const isLeader = player.email === leaderEmail && currentRoundIndex > 1;
+                {sortedPlayers.map((player: Player, index: number) => {
                     const isDealer = player.email === dealer?.email;
                     const isMe = player.email === currentUserEmail;
-                    const isLast = player.email === lastPlayer?.email && isGameEnded;
+                    const isLast = index === sortedPlayers.length - 1 && isGameEnded;
+                    const positionIndicator = getPositionIndicator(index, sortedPlayers.length, isGameEnded);
                     
                     const bid = activeRound?.bids?.[player.email];
                     const tricks = activeRound?.tricks?.[player.email];
@@ -289,25 +305,17 @@ export function Scoreboard({
                             className={`
                                 relative p-4 rounded-xl border bg-[var(--card)] transition-all cursor-pointer hover:bg-[var(--secondary)]/50 touch-manipulation
                                 ${isMe ? 'border-[var(--primary)]/50 bg-[var(--primary)]/5' : 'border-[var(--border)]'}
-                                ${isLast && isGameEnded ? 'border-2 border-purple-500/50 bg-gradient-to-r from-red-500/10 via-yellow-500/10 via-green-500/10 via-blue-500/10 via-indigo-500/10 to-purple-500/10' : ''}
+                                ${isLast ? 'border-2 border-purple-500/50 bg-gradient-to-r from-red-500/10 via-yellow-500/10 via-green-500/10 via-blue-500/10 via-indigo-500/10 to-purple-500/10' : ''}
                             `}
                         >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {/* Avatar/Dealer Chip */}
                                     <div 
-                                        className="relative group"
+                                        className="relative group shrink-0"
                                         onClick={(e) => handleAvatarClick(player, e)}
                                     >
-                                        {isLeader ? (
-                                            <div className="w-10 h-10 rounded-full bg-yellow-500 text-black flex items-center justify-center">
-                                                <Trophy size={18} />
-                                            </div>
-                                        ) : isLast && isGameEnded ? (
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center text-2xl">
-                                                🏳️‍🌈
-                                            </div>
-                                        ) : player.image ? (
+                                        {player.image ? (
                                             <>
                                                 <img 
                                                     src={player.image} 
@@ -340,18 +348,27 @@ export function Scoreboard({
                                         )}
                                     </div>
                                     
-                                    <div>
-                                        <div className="font-semibold text-lg leading-none mb-1 flex items-center gap-2">
-                                            {player.name} 
-                                            {isMe && <span className="text-xs font-normal text-[var(--muted-foreground)]">(You)</span>}
-                                            {isLast && isGameEnded && <span className="text-2xl">🏳️‍🌈</span>}
-
-                                            {/* W/L Indicators */}
-                                            <div className="flex gap-0.5 ml-1">
+                                    <div className="min-w-0 flex-1">
+                                        {/* Player Name Row */}
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-semibold text-lg leading-tight">
+                                                {player.name}
+                                            </span>
+                                            {positionIndicator && (
+                                                <span className="text-base">{positionIndicator}</span>
+                                            )}
+                                            {isMe && (
+                                                <span className="text-xs font-normal text-[var(--muted-foreground)]">(You)</span>
+                                            )}
+                                        </div>
+                                        
+                                        {/* W/L History Row - separate row with wrapping */}
+                                        {history.length > 0 && (
+                                            <div className="flex flex-wrap gap-0.5 mt-1 max-w-full">
                                                 {history.map((isWin: boolean, i: number) => (
                                                     <span 
                                                         key={i} 
-                                                        className={`text-[10px] font-bold px-1 rounded-sm ${
+                                                        className={`text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-sm ${
                                                             isWin 
                                                                 ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
                                                                 : 'bg-red-500/20 text-red-600 dark:text-red-400'
@@ -361,10 +378,11 @@ export function Scoreboard({
                                                     </span>
                                                 ))}
                                             </div>
-                                        </div>
+                                        )}
+                                        
                                         {/* Current Round Stats */}
                                         {activeRound && (
-                                            <div className="flex items-center gap-3 text-xs font-mono text-[var(--muted-foreground)]">
+                                            <div className="flex items-center gap-3 text-xs font-mono text-[var(--muted-foreground)] mt-1">
                                                 <div className="flex items-center gap-1 bg-[var(--background)] px-1.5 py-0.5 rounded">
                                                     <span>Bid:</span>
                                                     <span className={hasBid ? 'text-[var(--foreground)] font-bold' : ''}>
@@ -385,7 +403,7 @@ export function Scoreboard({
                                 </div>
 
                                 {/* Total Score */}
-                                <div className="text-4xl font-bold tracking-tight font-mono">
+                                <div className="text-3xl font-bold tracking-tight font-mono shrink-0">
                                     {player.score}
                                 </div>
                             </div>
@@ -469,6 +487,13 @@ export function Scoreboard({
                 onClose={() => setSelectedPlayer(null)} 
                 player={selectedPlayer}
                 rounds={rounds}
+            />
+
+            <ImageCropperOverlay
+                isOpen={!!cropperImage}
+                imageSrc={cropperImage || ''}
+                onClose={() => setCropperImage(null)}
+                onCropComplete={handleCropComplete}
             />
         </div>
     );

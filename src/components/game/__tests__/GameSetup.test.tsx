@@ -28,6 +28,17 @@ jest.mock('@dnd-kit/sortable', () => ({
 // Mock fetch
 global.fetch = jest.fn();
 
+// Mock react-easy-crop
+jest.mock('react-easy-crop', () => {
+    const React = require('react');
+    return function MockCropper({ onCropComplete }: { onCropComplete: (croppedArea: any, croppedAreaPixels: any) => void }) {
+        React.useEffect(() => {
+            onCropComplete({ x: 0, y: 0, width: 100, height: 100 }, { x: 0, y: 0, width: 200, height: 200 });
+        }, [onCropComplete]);
+        return <div data-testid="mock-cropper">Mock Cropper</div>;
+    };
+});
+
 describe('GameSetup', () => {
   const mockGameState: GameState = {
     id: 'game1',
@@ -58,38 +69,39 @@ describe('GameSetup', () => {
     (global.fetch as jest.Mock).mockClear();
   });
 
-  it('should allow image upload for current user when clicking avatar', async () => {
-    render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+  it('should open cropper when image is selected for upload', async () => {
+    const { container } = render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
 
     // Hidden file input should be present
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
 
-    // Find the avatar for Player 1 (Current User)
-    // We can find it by finding the image with src 'old-image.jpg'
-    const avatar = screen.getByAltText('Player 1');
-    const avatarContainer = avatar.closest('.group');
-    
-    // Simulate clicking the avatar to trigger file input click
-    // Since we can't easily spy on fileInput.click() in JSDOM, we'll verify the event handler logic
-    // But we can simulate the file change event which is what actually triggers the upload
-    
+    // Simulate file selection with FileReader mock
     const file = new File(['(⌐□_□)'], 'new_avatar.png', { type: 'image/png' });
+
+    // Mock FileReader that triggers callback synchronously
+    const mockFileReaderInstance = {
+      readAsDataURL: jest.fn(function(this: any) {
+          if (this.onloadend) {
+              this.onloadend();
+          }
+      }),
+      onloadend: null as any,
+      result: 'data:image/png;base64,testimage'
+    };
+    jest.spyOn(window, 'FileReader').mockImplementation(() => mockFileReaderInstance as any);
+
     Object.defineProperty(fileInput, 'files', {
       value: [file]
     });
-    
-    fireEvent.change(fileInput);
-    
+
+    await waitFor(async () => {
+        fireEvent.change(fileInput);
+    });
+
     await waitFor(() => {
-        // It should call the API to upload
-        expect(global.fetch).toHaveBeenCalledWith(
-            expect.stringContaining('/api/games/game1/players'),
-            expect.objectContaining({
-                method: 'PATCH',
-                body: expect.stringContaining('"image":'),
-            })
-        );
+        // Image cropper should open
+        expect(screen.getByText('Crop Photo')).toBeInTheDocument();
     });
   });
 
