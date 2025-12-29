@@ -269,8 +269,8 @@ export function Scoreboard({
                                             </div>
                                         )}
                                         {isDealer && (
-                                            <div className="absolute -top-1 -right-1 bg-[var(--primary)] text-white p-0.5 rounded-full shadow-sm border border-[var(--background)]">
-                                                <span className="text-[10px] font-bold px-1">D</span>
+                                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-md flex items-center justify-center border-2 border-white dark:border-gray-800">
+                                                <span className="text-[9px] font-bold text-white">D</span>
                                             </div>
                                         )}
                                     </div>

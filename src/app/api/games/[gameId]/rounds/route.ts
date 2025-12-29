@@ -37,14 +37,20 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ gameId: string }> }
 ) {
+    const startTime = Date.now();
+    const timings: Record<string, number> = {};
+    
     // Validate CSRF protection
     if (!validateCSRF(req)) {
         return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
     }
+    timings.csrf = Date.now() - startTime;
 
     const { gameId } = await params;
+    timings.params = Date.now() - startTime;
     
     const token = await getAuthToken(req);
+    timings.auth = Date.now() - startTime;
     
     if (!token) {
         const cookies = req.cookies.getAll();
@@ -55,6 +61,7 @@ export async function POST(
     const body = await req.json();
     const { action, inputs, targetRoundIndex } = body;
     // action: START | BIDS | TRICKS | UNDO
+    timings.parseBody = Date.now() - startTime;
 
     // Resolve temp ID to real sheet ID if needed
     let actualGameId = gameId;
@@ -70,6 +77,7 @@ export async function POST(
         game = getGame(gameId); // Try original ID too
     }
     if (!game) return NextResponse.json({ error: "Game not loaded" }, { status: 404 });
+    timings.getGame = Date.now() - startTime;
 
     // Check authorization: Only owner or operator can control rounds
     const isOwner = game.ownerEmail === token.email;
@@ -89,6 +97,10 @@ export async function POST(
         console.error("Failed to initialize Google Sheets client:", e);
         // Continue without Google Sheets - game will work in memory only
     }
+    timings.sheetsInit = Date.now() - startTime;
+    
+    // Log timings for debugging slow requests
+    console.log(`[API /rounds] Timings for ${action}:`, timings);
 
     try {
         if (action === 'START') {
@@ -596,10 +608,16 @@ export async function POST(
                 (global as any).broadcastGameUpdate(actualGameId, game);
             }
         }
+        
+        const totalTime = Date.now() - startTime;
+        console.log(`[API /rounds] ${action} completed in ${totalTime}ms`);
+        
         return NextResponse.json({ success: true, game });
 
     } catch (e) {
         console.error(e);
+        const totalTime = Date.now() - startTime;
+        console.error(`[API /rounds] ${action} failed after ${totalTime}ms`);
         return NextResponse.json({ error: "Failed to update round" }, { status: 500 });
     }
 }

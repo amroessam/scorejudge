@@ -156,8 +156,8 @@ function SortablePlayerItem({
                     </div>
                 )}
                 {isFirstDealer && (
-                    <div className="absolute -top-1 -right-1 bg-yellow-500 text-black p-0.5 rounded-full shadow-sm">
-                        <Crown size={12} fill="currentColor" />
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-md flex items-center justify-center border-2 border-white dark:border-gray-800">
+                        <Crown size={10} className="text-white" fill="currentColor" />
                     </div>
                 )}
             </div>
