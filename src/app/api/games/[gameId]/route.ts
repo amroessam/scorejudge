@@ -176,16 +176,8 @@ export async function DELETE(
             }, { status: 403 });
         }
 
-        // 3. Check if game has started
-        // Game has started if: currentRoundIndex > 0 OR has any completed rounds OR has rounds in PLAYING state
-        const hasStarted = game.currentRoundIndex > 0 || 
-            (game.rounds && game.rounds.some((r: any) => r.state === 'COMPLETED' || r.state === 'PLAYING'));
-
-        if (hasStarted) {
-            return NextResponse.json({ 
-                error: "Cannot delete a game that has already started. Only games that haven't started can be deleted." 
-            }, { status: 400 });
-        }
+        // 3. Owner can delete games in any state (not started, in progress, paused, or completed)
+        // No restriction on game state - owners have full control
 
         // 4. Broadcast discovery update BEFORE removing from memory
         // This allows discovery clients to receive the deletion notification

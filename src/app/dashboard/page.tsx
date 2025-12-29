@@ -300,7 +300,8 @@ export default function Dashboard() {
     const canDelete = (gameId: string): boolean => {
         const state = gameStates[gameId];
         if (!state) return false;
-        return state.ownerEmail === session?.user?.email && !hasGameStarted(gameId);
+        // Owner can delete games in any state (not started, in progress, paused, or completed)
+        return state.ownerEmail === session?.user?.email;
     };
 
     const getGameStatus = (gameId: string) => {
