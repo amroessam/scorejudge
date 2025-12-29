@@ -94,16 +94,20 @@ export async function POST(
     }
 
     let sheets: any = null;
-    // Skip Google Sheets for temp games - they don't have a real sheet ID yet
+    // Skip Google Sheets if the game explicitly has skipSheetSync set
     // This avoids unnecessary OAuth token operations that can be slow
-    if (!actualGameId.startsWith('temp_')) {
+    if (!game.skipSheetSync) {
         try {
+            const sheetsInitStart = Date.now();
             const auth = getGoogleFromToken(token);
             sheets = google.sheets({ version: 'v4', auth });
+            console.log(`[API /rounds] Sheets client init took ${Date.now() - sheetsInitStart}ms`);
         } catch (e) {
             console.error("Failed to initialize Google Sheets client:", e);
             // Continue without Google Sheets - game will work in memory only
         }
+    } else {
+        console.log(`[API /rounds] Skipping sheets init - game.skipSheetSync is true`);
     }
     timings.sheetsInit = Date.now() - startTime;
     
@@ -159,7 +163,7 @@ export async function POST(
                 game.currentRoundIndex = 1;
 
                 // Update Current Round in Google Sheet (fire-and-forget)
-                if (sheets && !actualGameId.startsWith('temp_')) {
+                if (sheets && !game.skipSheetSync) {
                     sheets.spreadsheets.values.update({
                         spreadsheetId: actualGameId,
                         range: 'Game!B5', // Current Round row
@@ -173,7 +177,7 @@ export async function POST(
                 }
 
                 // Write plan to 'Rounds' tab (fire-and-forget - non-blocking)
-                if (sheets && !actualGameId.startsWith('temp_')) {
+                if (sheets && !game.skipSheetSync) {
                     const values = game.rounds.map(r => [r.index, r.cards, r.trump, 'BIDDING', '']);
                     sheets.spreadsheets.values.update({
                         spreadsheetId: actualGameId,
@@ -195,7 +199,7 @@ export async function POST(
                 }
                 
                 // Update Current Round in Google Sheet (fire-and-forget)
-                if (sheets && !actualGameId.startsWith('temp_')) {
+                if (sheets && !game.skipSheetSync) {
                     sheets.spreadsheets.values.update({
                         spreadsheetId: actualGameId,
                         range: 'Game!B5', // Current Round row
@@ -258,7 +262,7 @@ export async function POST(
             round.state = 'PLAYING';
 
             // Update Rounds sheet - mark round as PLAYING (fire-and-forget)
-            if (sheets && !actualGameId.startsWith('temp_')) {
+            if (sheets && !game.skipSheetSync) {
                 sheets.spreadsheets.values.update({
                     spreadsheetId: actualGameId,
                     range: `Rounds!D${round.index + 1}`, // State column for this round
@@ -404,7 +408,7 @@ export async function POST(
             });
 
             // Update Rounds sheet - mark round as COMPLETED (fire-and-forget)
-            if (sheets && !actualGameId.startsWith('temp_')) {
+            if (sheets && !game.skipSheetSync) {
                 const completedAt = new Date().toISOString();
                 sheets.spreadsheets.values.update({
                     spreadsheetId: actualGameId,
@@ -427,7 +431,7 @@ export async function POST(
                 // currentRoundIndex stays at the final round
                 
                 // Update Google Sheet game status and mark all completed rounds as COMPLETED (fire-and-forget)
-                if (sheets && !actualGameId.startsWith('temp_')) {
+                if (sheets && !game.skipSheetSync) {
                     // Update game status
                     sheets.spreadsheets.values.update({
                         spreadsheetId: actualGameId,
@@ -496,7 +500,7 @@ export async function POST(
                     }
                     
                     // Update Current Round in Google Sheet (fire-and-forget)
-                    if (sheets && !actualGameId.startsWith('temp_')) {
+                    if (sheets && !game.skipSheetSync) {
                         sheets.spreadsheets.values.update({
                             spreadsheetId: actualGameId,
                             range: 'Game!B5', // Current Round row
@@ -529,8 +533,8 @@ export async function POST(
                     rows.push([round.index, p.email, bid, tricks === -1 ? '' : tricks, points, p.score]);
                 }
 
-                // Don't await - let it run in background (only if not temp ID)
-                if (!actualGameId.startsWith('temp_')) {
+                // Don't await - let it run in background (only if sheet sync is enabled)
+                if (sheets && !game.skipSheetSync) {
                     sheets.spreadsheets.values.append({
                         spreadsheetId: actualGameId,
                         range: 'Scores!A:F',
@@ -590,7 +594,7 @@ export async function POST(
             // currentRoundIndex stays the same - we're just resetting the round
 
             // Update Google Sheet if available (fire-and-forget)
-            if (sheets && !actualGameId.startsWith('temp_')) {
+            if (sheets && !game.skipSheetSync) {
                 // Update round state in Rounds sheet
                 sheets.spreadsheets.values.update({
                     spreadsheetId: actualGameId,

@@ -34,6 +34,9 @@ export interface GameState {
     // Timestamps
     createdAt: number; // When the game was created
     lastUpdated: number; // When the game was last updated
+    
+    // Skip Google Sheets sync for this game (for temp/offline games)
+    skipSheetSync?: boolean;
 }
 
 const globalForStore = globalThis as unknown as { gameStore: Map<string, GameState> };

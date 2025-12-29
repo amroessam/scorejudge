@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
             ownerEmail: token.email as string || '',
             operatorEmail: token.email as string || '',
             createdAt: now,
-            lastUpdated: now
+            lastUpdated: now,
+            skipSheetSync: true  // Start with sheet sync disabled until sheet is created
         };
         setGame(tempId, initialGameState);
         console.log(`[API] Created game ${tempId} in memory. Owner: ${token.email}`);
@@ -105,8 +106,8 @@ export async function POST(req: NextRequest) {
             },
             tempId,
             (tempGameId: string, sheetId: string) => {
-                // Update game state with real sheetId
-                const game = setGame(tempGameId, { ...initialGameState, id: sheetId });
+                // Update game state with real sheetId and enable sheet sync
+                const game = setGame(tempGameId, { ...initialGameState, id: sheetId, skipSheetSync: false });
                 // Also store with real sheetId
                 setGame(sheetId, game);
                 // Map temp ID to sheet ID for lookups

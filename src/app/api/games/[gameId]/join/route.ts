@@ -106,7 +106,7 @@ export async function POST(
 
     // 5. Fire-and-forget: Add to Google Sheet in background (non-blocking)
     // This runs after we return the response, so the user sees immediate feedback
-    if (!gameId.startsWith('temp_')) {
+    if (!game.skipSheetSync) {
         syncPlayerToSheetAsync(token, actualGameId, game.ownerEmail);
     }
 
