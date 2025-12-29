@@ -202,3 +202,263 @@ describe('ScoreEntryOverlay - Game End', () => {
         expect(finalRound?.state).toBe('COMPLETED');
     });
 });
+
+describe('ScoreEntryOverlay - Trick Validation for Zero Bids', () => {
+    const mockOnGameUpdate = jest.fn();
+    const mockOnClose = jest.fn();
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        (global.fetch as jest.Mock).mockClear();
+    });
+
+    it('should reject all 3 players marked as missed when only 1 card dealt and all bid 0', async () => {
+        // Scenario: 1 card dealt, 3 players all bid 0
+        // Maximum 1 player can miss (took the 1 trick), so 2 must have made it
+        const gameState: GameState = {
+            id: 'game1',
+            name: 'Test Game',
+            players: [
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+            ],
+            rounds: [
+                {
+                    index: 1,
+                    cards: 1, // Only 1 card dealt
+                    trump: 'S',
+                    state: 'PLAYING',
+                    bids: { 'p1@test.com': 0, 'p2@test.com': 0, 'p3@test.com': 0 }, // All bid 0
+                    tricks: {},
+                },
+            ],
+            currentRoundIndex: 1,
+            ownerEmail: 'p1@test.com',
+            lastUpdated: Date.now(),
+        };
+
+        render(
+            <ScoreEntryOverlay
+                isOpen={true}
+                onClose={mockOnClose}
+                gameId="game1"
+                gameState={gameState}
+                onGameUpdate={mockOnGameUpdate}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText(/Enter Tricks/i)).toBeInTheDocument();
+        });
+
+        // Mark ALL players as missed (this should be invalid!)
+        const missButtons = screen.getAllByTitle('Missed bid');
+        fireEvent.click(missButtons[0]); // p1 - missed
+        fireEvent.click(missButtons[1]); // p2 - missed
+        fireEvent.click(missButtons[2]); // p3 - missed
+
+        // Try to submit
+        const submitButton = screen.getByText(/Confirm Scores/i);
+        fireEvent.click(submitButton);
+
+        // Should show validation error
+        await waitFor(() => {
+            expect(screen.getByText(/at most 1 player\(s\) can miss/i)).toBeInTheDocument();
+        });
+
+        // API should NOT have been called
+        expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should reject all 3 players marked as missed when only 2 cards dealt and all bid 0', async () => {
+        // Scenario: 2 cards dealt, 3 players all bid 0
+        // Maximum 2 players can miss (took 1 trick each), so at least 1 must have made it
+        const gameState: GameState = {
+            id: 'game1',
+            name: 'Test Game',
+            players: [
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+            ],
+            rounds: [
+                {
+                    index: 1,
+                    cards: 2, // 2 cards dealt
+                    trump: 'S',
+                    state: 'PLAYING',
+                    bids: { 'p1@test.com': 0, 'p2@test.com': 0, 'p3@test.com': 0 }, // All bid 0
+                    tricks: {},
+                },
+            ],
+            currentRoundIndex: 1,
+            ownerEmail: 'p1@test.com',
+            lastUpdated: Date.now(),
+        };
+
+        render(
+            <ScoreEntryOverlay
+                isOpen={true}
+                onClose={mockOnClose}
+                gameId="game1"
+                gameState={gameState}
+                onGameUpdate={mockOnGameUpdate}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText(/Enter Tricks/i)).toBeInTheDocument();
+        });
+
+        // Mark ALL players as missed (this should be invalid - only max 2 can miss)
+        const missButtons = screen.getAllByTitle('Missed bid');
+        fireEvent.click(missButtons[0]); // p1 - missed
+        fireEvent.click(missButtons[1]); // p2 - missed
+        fireEvent.click(missButtons[2]); // p3 - missed
+
+        // Try to submit
+        const submitButton = screen.getByText(/Confirm Scores/i);
+        fireEvent.click(submitButton);
+
+        // Should show validation error
+        await waitFor(() => {
+            expect(screen.getByText(/at most 2 player\(s\) can miss/i)).toBeInTheDocument();
+        });
+
+        // API should NOT have been called
+        expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should allow 2 players made and 1 missed when 1 card dealt and all bid 0', async () => {
+        // Valid scenario: 1 card dealt, 3 players all bid 0
+        // 2 made (got 0 tricks each), 1 missed (took the 1 trick)
+        const gameState: GameState = {
+            id: 'game1',
+            name: 'Test Game',
+            players: [
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+            ],
+            rounds: [
+                {
+                    index: 1,
+                    cards: 1, // Only 1 card dealt
+                    trump: 'S',
+                    state: 'PLAYING',
+                    bids: { 'p1@test.com': 0, 'p2@test.com': 0, 'p3@test.com': 0 }, // All bid 0
+                    tricks: {},
+                },
+            ],
+            currentRoundIndex: 1,
+            ownerEmail: 'p1@test.com',
+            lastUpdated: Date.now(),
+        };
+
+        // Mock successful API response
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                success: true,
+                game: gameState,
+            }),
+        });
+
+        render(
+            <ScoreEntryOverlay
+                isOpen={true}
+                onClose={mockOnClose}
+                gameId="game1"
+                gameState={gameState}
+                onGameUpdate={mockOnGameUpdate}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText(/Enter Tricks/i)).toBeInTheDocument();
+        });
+
+        // Mark 2 as made, 1 as missed (valid!)
+        const checkButtons = screen.getAllByTitle('Made bid');
+        const missButtons = screen.getAllByTitle('Missed bid');
+        fireEvent.click(checkButtons[0]); // p1 - made
+        fireEvent.click(checkButtons[1]); // p2 - made
+        fireEvent.click(missButtons[2]); // p3 - missed
+
+        // Submit
+        const submitButton = screen.getByText(/Confirm Scores/i);
+        fireEvent.click(submitButton);
+
+        // API should be called (validation passed)
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalled();
+        });
+    });
+
+    it('should allow 1 player made and 2 missed when 2 cards dealt and all bid 0', async () => {
+        // Valid scenario: 2 cards dealt, 3 players all bid 0
+        // 1 made (got 0 tricks), 2 missed (took 1 trick each)
+        const gameState: GameState = {
+            id: 'game1',
+            name: 'Test Game',
+            players: [
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+            ],
+            rounds: [
+                {
+                    index: 1,
+                    cards: 2, // 2 cards dealt
+                    trump: 'S',
+                    state: 'PLAYING',
+                    bids: { 'p1@test.com': 0, 'p2@test.com': 0, 'p3@test.com': 0 }, // All bid 0
+                    tricks: {},
+                },
+            ],
+            currentRoundIndex: 1,
+            ownerEmail: 'p1@test.com',
+            lastUpdated: Date.now(),
+        };
+
+        // Mock successful API response
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                success: true,
+                game: gameState,
+            }),
+        });
+
+        render(
+            <ScoreEntryOverlay
+                isOpen={true}
+                onClose={mockOnClose}
+                gameId="game1"
+                gameState={gameState}
+                onGameUpdate={mockOnGameUpdate}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText(/Enter Tricks/i)).toBeInTheDocument();
+        });
+
+        // Mark 1 as made, 2 as missed (valid!)
+        const checkButtons = screen.getAllByTitle('Made bid');
+        const missButtons = screen.getAllByTitle('Missed bid');
+        fireEvent.click(checkButtons[0]); // p1 - made
+        fireEvent.click(missButtons[1]); // p2 - missed
+        fireEvent.click(missButtons[2]); // p3 - missed
+
+        // Submit
+        const submitButton = screen.getByText(/Confirm Scores/i);
+        fireEvent.click(submitButton);
+
+        // API should be called (validation passed)
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalled();
+        });
+    });
+});

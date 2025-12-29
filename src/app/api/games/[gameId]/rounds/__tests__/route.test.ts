@@ -405,5 +405,201 @@ describe('/api/games/[gameId]/rounds', () => {
       expect(data.error).toContain('not loaded');
     });
   });
+
+  describe('Zero bids validation', () => {
+    it('should reject all 3 players missed when only 1 card dealt and all bid 0', async () => {
+      (getAuthToken as jest.Mock).mockResolvedValue({
+        id: 'player1',
+        name: 'Player One',
+        email: 'player1@test.com',
+      });
+
+      // Create game where all bid 0 and only 1 card dealt
+      const gameState = createGameState(3, {
+        currentRoundIndex: 1,
+        rounds: [
+          {
+            index: 1,
+            cards: 1, // Only 1 card dealt
+            trump: 'S',
+            state: 'PLAYING',
+            bids: {
+              'player1@test.com': 0,
+              'player2@test.com': 0,
+              'player3@test.com': 0,
+            },
+            tricks: {},
+          },
+        ],
+      });
+      setGame('game1', gameState);
+
+      // Try to mark all 3 as missed (only max 1 can miss with 1 card)
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TRICKS',
+          inputs: {
+            'player1@test.com': -1, // Missed
+            'player2@test.com': -1, // Missed
+            'player3@test.com': -1, // Missed - INVALID! Max 1 can miss
+          },
+        }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('at most 1 player(s) can miss');
+    });
+
+    it('should reject all 3 players missed when only 2 cards dealt and all bid 0', async () => {
+      (getAuthToken as jest.Mock).mockResolvedValue({
+        id: 'player1',
+        name: 'Player One',
+        email: 'player1@test.com',
+      });
+
+      // Create game where all bid 0 and 2 cards dealt
+      const gameState = createGameState(3, {
+        currentRoundIndex: 1,
+        rounds: [
+          {
+            index: 1,
+            cards: 2, // 2 cards dealt
+            trump: 'S',
+            state: 'PLAYING',
+            bids: {
+              'player1@test.com': 0,
+              'player2@test.com': 0,
+              'player3@test.com': 0,
+            },
+            tricks: {},
+          },
+        ],
+      });
+      setGame('game1', gameState);
+
+      // Try to mark all 3 as missed (only max 2 can miss with 2 cards)
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TRICKS',
+          inputs: {
+            'player1@test.com': -1, // Missed
+            'player2@test.com': -1, // Missed
+            'player3@test.com': -1, // Missed - INVALID! Max 2 can miss
+          },
+        }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('at most 2 player(s) can miss');
+    });
+
+    it('should allow 2 players made and 1 missed when 1 card dealt and all bid 0', async () => {
+      (getAuthToken as jest.Mock).mockResolvedValue({
+        id: 'player1',
+        name: 'Player One',
+        email: 'player1@test.com',
+      });
+
+      // Create game where all bid 0 and only 1 card dealt
+      const gameState = createGameState(3, {
+        currentRoundIndex: 1,
+        rounds: [
+          {
+            index: 1,
+            cards: 1, // Only 1 card dealt
+            trump: 'S',
+            state: 'PLAYING',
+            bids: {
+              'player1@test.com': 0,
+              'player2@test.com': 0,
+              'player3@test.com': 0,
+            },
+            tricks: {},
+          },
+        ],
+      });
+      setGame('game1', gameState);
+
+      // 2 made, 1 missed - VALID
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TRICKS',
+          inputs: {
+            'player1@test.com': 0, // Made
+            'player2@test.com': 0, // Made
+            'player3@test.com': -1, // Missed (took the 1 trick)
+          },
+        }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.game.rounds[0].state).toBe('COMPLETED');
+    });
+
+    it('should allow 1 player made and 2 missed when 2 cards dealt and all bid 0', async () => {
+      (getAuthToken as jest.Mock).mockResolvedValue({
+        id: 'player1',
+        name: 'Player One',
+        email: 'player1@test.com',
+      });
+
+      // Create game where all bid 0 and 2 cards dealt
+      const gameState = createGameState(3, {
+        currentRoundIndex: 1,
+        rounds: [
+          {
+            index: 1,
+            cards: 2, // 2 cards dealt
+            trump: 'S',
+            state: 'PLAYING',
+            bids: {
+              'player1@test.com': 0,
+              'player2@test.com': 0,
+              'player3@test.com': 0,
+            },
+            tricks: {},
+          },
+        ],
+      });
+      setGame('game1', gameState);
+
+      // 1 made, 2 missed - VALID
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TRICKS',
+          inputs: {
+            'player1@test.com': 0, // Made
+            'player2@test.com': -1, // Missed
+            'player3@test.com': -1, // Missed
+          },
+        }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.game.rounds[0].state).toBe('COMPLETED');
+    });
+  });
 });
 

@@ -230,6 +230,33 @@ export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: {
                 alert(`Invalid: All players are marked as Made, but only ${sumMadeBids} out of ${cardsPerPlayer} tricks are accounted for. There are ${unaccountedTricks} unaccounted trick(s). At least one player must have missed their bid to account for these tricks.`);
                 return;
             }
+
+            // Check if all players bid 0
+            const allBidsZero = gameState.players.every((p: any) => {
+                const bid = activeRound.bids?.[p.email];
+                return bid === 0 || bid === undefined;
+            });
+
+            // Count how many players missed their bid
+            let missedCount = 0;
+            gameState.players.forEach((p: any) => {
+                const tricksValue = inputs[p.email];
+                const numTricksValue = typeof tricksValue === 'string' ? parseInt(tricksValue, 10) : Number(tricksValue);
+                if (numTricksValue === -1) {
+                    missedCount++;
+                }
+            });
+
+            // When all bid 0, the number of missed players cannot exceed the number of cards
+            // because each missed player took at least 1 trick
+            // Example: 1 card dealt, 3 players all bid 0 → max 1 can miss (who took the 1 trick)
+            // Example: 2 cards dealt, 3 players all bid 0 → max 2 can miss
+            if (allBidsZero && missedCount > cardsPerPlayer) {
+                const maxMissed = cardsPerPlayer;
+                const minMade = gameState.players.length - maxMissed;
+                alert(`Invalid: With ${cardsPerPlayer} card(s) dealt and all 0 bids, at most ${maxMissed} player(s) can miss their bid. At least ${minMade} player(s) must have made it (got 0 tricks). You marked ${missedCount} as missed.`);
+                return;
+            }
         }
 
         setLoading(true);

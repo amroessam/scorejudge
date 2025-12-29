@@ -338,6 +338,33 @@ export async function POST(
                 }, { status: 400 });
             }
 
+            // Check if all players bid 0
+            const allBidsZero = game.players.every((p: any) => {
+                const bid = round.bids[p.email];
+                return bid === 0 || bid === undefined;
+            });
+
+            // Count how many players missed their bid
+            let missedCount = 0;
+            game.players.forEach((p: any) => {
+                const tricksValue = validatedInputs[p.email];
+                if (tricksValue === -1) {
+                    missedCount++;
+                }
+            });
+
+            // When all bid 0, the number of missed players cannot exceed the number of cards
+            // because each missed player took at least 1 trick
+            // Example: 1 card dealt, 3 players all bid 0 → max 1 can miss (who took the 1 trick)
+            // Example: 2 cards dealt, 3 players all bid 0 → max 2 can miss
+            if (allBidsZero && missedCount > cardsPerPlayer) {
+                const maxMissed = cardsPerPlayer;
+                const minMade = game.players.length - maxMissed;
+                return NextResponse.json({ 
+                    error: `Invalid: With ${cardsPerPlayer} card(s) dealt and all 0 bids, at most ${maxMissed} player(s) can miss their bid. At least ${minMade} player(s) must have made it (got 0 tricks). You marked ${missedCount} as missed.` 
+                }, { status: 400 });
+            }
+
             round.tricks = validatedInputs;
             round.state = 'COMPLETED';
 

@@ -245,7 +245,7 @@ export function ScoreEntryOverlay({
             });
 
             // Validation logic from RoundControls
-            let hasMissedBids = false;
+            let missedCount = 0;
             let sumMadeBids = 0;
             
             players.forEach((p: Player) => {
@@ -254,14 +254,26 @@ export function ScoreEntryOverlay({
                 if (bid !== undefined && tricksValue !== undefined && tricksValue !== -1 && bid === tricksValue) {
                     sumMadeBids += tricksValue;
                 } else if (bid !== undefined && tricksValue === -1) {
-                    hasMissedBids = true;
+                    missedCount++;
                 }
             });
+
+            const hasMissedBids = missedCount > 0;
 
             // If all players bid 0, at least one must have missed (taken tricks)
             // because there are cards dealt that must be taken by someone
             if (allBidsZero && !hasMissedBids) {
                 return `Invalid: All players bid 0, but there are ${cardsPerPlayer} cards dealt. At least one player must have missed their bid (taken tricks).`;
+            }
+
+            // When all bid 0, the number of missed players cannot exceed the number of cards
+            // because each missed player took at least 1 trick
+            // Example: 1 card dealt, 3 players all bid 0 → max 1 can miss (who took the 1 trick)
+            // Example: 2 cards dealt, 3 players all bid 0 → max 2 can miss
+            if (allBidsZero && missedCount > cardsPerPlayer) {
+                const maxMissed = cardsPerPlayer;
+                const minMade = players.length - maxMissed;
+                return `Invalid: With ${cardsPerPlayer} card(s) dealt and all 0 bids, at most ${maxMissed} player(s) can miss their bid. At least ${minMade} player(s) must have made it (got 0 tricks). You marked ${missedCount} as missed.`;
             }
 
             if (sumMadeBids > cardsPerPlayer) {
