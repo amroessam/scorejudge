@@ -40,6 +40,8 @@ export async function POST(
     const startTime = Date.now();
     const timings: Record<string, number> = {};
     
+    console.log(`[API /rounds] Request started at ${new Date().toISOString()}`);
+    
     // Validate CSRF protection
     if (!validateCSRF(req)) {
         return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
@@ -49,8 +51,10 @@ export async function POST(
     const { gameId } = await params;
     timings.params = Date.now() - startTime;
     
+    const authStart = Date.now();
     const token = await getAuthToken(req);
     timings.auth = Date.now() - startTime;
+    console.log(`[API /rounds] Auth took ${Date.now() - authStart}ms`);
     
     if (!token) {
         const cookies = req.cookies.getAll();
@@ -90,12 +94,16 @@ export async function POST(
     }
 
     let sheets: any = null;
-    try {
-        const auth = getGoogleFromToken(token);
-        sheets = google.sheets({ version: 'v4', auth });
-    } catch (e) {
-        console.error("Failed to initialize Google Sheets client:", e);
-        // Continue without Google Sheets - game will work in memory only
+    // Skip Google Sheets for temp games - they don't have a real sheet ID yet
+    // This avoids unnecessary OAuth token operations that can be slow
+    if (!actualGameId.startsWith('temp_')) {
+        try {
+            const auth = getGoogleFromToken(token);
+            sheets = google.sheets({ version: 'v4', auth });
+        } catch (e) {
+            console.error("Failed to initialize Google Sheets client:", e);
+            // Continue without Google Sheets - game will work in memory only
+        }
     }
     timings.sheetsInit = Date.now() - startTime;
     

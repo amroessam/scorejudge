@@ -3,14 +3,17 @@ import { NextRequest } from "next/server";
 
 /**
  * Helper to get auth token with proper cookie name handling.
- * Tries both production and development cookie names to handle
- * cases where cookies might have been set with different names.
+ * Checks which cookie exists first to avoid unnecessary decryption attempts.
  */
 export async function getAuthToken(req: NextRequest) {
     const isProduction = process.env.NODE_ENV === 'production';
     
-    // Try production cookie name first if in production
-    if (isProduction) {
+    // Check which cookies are present to avoid trying both
+    const hasSecureCookie = req.cookies.has('__Secure-next-auth.session-token');
+    const hasStandardCookie = req.cookies.has('next-auth.session-token');
+    
+    // In production, prefer the secure cookie if it exists
+    if (isProduction && hasSecureCookie) {
         try {
             const token = await getToken({ 
                 req, 
@@ -23,16 +26,29 @@ export async function getAuthToken(req: NextRequest) {
         }
     }
     
-    // Try standard cookie name (works for both dev and prod if cookie was set with this name)
+    // Try standard cookie name if it exists
+    if (hasStandardCookie) {
+        try {
+            const token = await getToken({ 
+                req, 
+                secret: process.env.NEXTAUTH_SECRET,
+                cookieName: 'next-auth.session-token'
+            });
+            if (token) return token;
+        } catch (e) {
+            console.error('Error getting token:', e);
+        }
+    }
+    
+    // If neither specific cookie worked, try default behavior
     try {
         const token = await getToken({ 
             req, 
-            secret: process.env.NEXTAUTH_SECRET,
-            cookieName: 'next-auth.session-token'
+            secret: process.env.NEXTAUTH_SECRET
         });
         return token;
     } catch (e) {
-        console.error('Error getting token:', e);
+        console.error('Error getting token (default):', e);
         return null;
     }
 }
