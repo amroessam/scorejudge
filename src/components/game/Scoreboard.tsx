@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
     Trophy, 
     History, 
@@ -10,7 +10,8 @@ import {
     Crown,
     Home,
     Sparkles,
-    ArrowRight
+    ArrowRight,
+    Upload
 } from "lucide-react";
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
@@ -71,6 +72,7 @@ export function Scoreboard({
     onNextRound
 }: ScoreboardProps) {
     const router = useRouter();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
     const { players, currentRoundIndex, rounds, firstDealerEmail } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
@@ -142,8 +144,55 @@ export function Scoreboard({
         }
     }, [isGameEnded, isWinner]);
 
+    const handleAvatarClick = (player: Player, e: React.MouseEvent) => {
+        if (player.email === currentUserEmail) {
+            e.stopPropagation(); // Prevent opening history overlay
+            if (fileInputRef.current) {
+                fileInputRef.current.click();
+            }
+        }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Reset the input value so the same file can be selected again if needed
+        e.target.value = '';
+
+        // Basic validation
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            alert("Image is too large. Please choose an image under 5MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            const base64String = reader.result as string;
+            try {
+                await fetch(`/api/games/${gameId}/players`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64String })
+                });
+            } catch (err) {
+                console.error("Failed to upload image", err);
+                alert("Failed to update profile picture");
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
     return (
         <div className="flex flex-col h-full bg-[var(--background)] overflow-hidden">
+             <input 
+                type="file" 
+                ref={fileInputRef}
+                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, overflow: 'hidden' }}
+                accept="image/*"
+                onChange={handleFileChange}
+            />
+
             {/* Winner Confetti Overlay - only visible to winner */}
             {isGameEnded && isWinner && (
                 <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
@@ -222,6 +271,17 @@ export function Scoreboard({
                     const hasBid = bid !== undefined;
                     const hasTricks = tricks !== undefined && tricks !== -1;
 
+                     // Calculate W/L History
+                    const history = rounds
+                        .filter((r: any) => r.state === 'COMPLETED' && r.bids?.[player.email] !== undefined)
+                        .sort((a: any, b: any) => a.index - b.index)
+                        .map((r: any) => {
+                            const bid = r.bids[player.email];
+                            const tricks = r.tricks?.[player.email];
+                            // Win if bid met exactly, Loss otherwise
+                            return bid === tricks;
+                        });
+
                     return (
                         <div 
                             key={player.email} 
@@ -235,7 +295,10 @@ export function Scoreboard({
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     {/* Avatar/Dealer Chip */}
-                                    <div className="relative">
+                                    <div 
+                                        className="relative group"
+                                        onClick={(e) => handleAvatarClick(player, e)}
+                                    >
                                         {isLeader ? (
                                             <div className="w-10 h-10 rounded-full bg-yellow-500 text-black flex items-center justify-center">
                                                 <Trophy size={18} />
@@ -245,17 +308,29 @@ export function Scoreboard({
                                                 🏳️‍🌈
                                             </div>
                                         ) : player.image ? (
-                                            <img 
-                                                src={player.image} 
-                                                alt={player.name}
-                                                className="w-10 h-10 rounded-full object-cover"
-                                            />
+                                            <>
+                                                <img 
+                                                    src={player.image} 
+                                                    alt={player.name}
+                                                    className="w-10 h-10 rounded-full object-cover"
+                                                />
+                                                {isMe && (
+                                                    <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                        <Upload size={14} className="text-white" />
+                                                    </div>
+                                                )}
+                                            </>
                                         ) : (
                                             <div className={`
-                                                w-10 h-10 rounded-full flex items-center justify-center font-bold
+                                                w-10 h-10 rounded-full flex items-center justify-center font-bold relative
                                                 bg-[var(--secondary)] text-[var(--muted-foreground)]
                                             `}>
                                                 {player.name.charAt(0)}
+                                                {isMe && (
+                                                    <div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                        <Upload size={14} className="text-[var(--foreground)]" />
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         {isDealer && (
@@ -266,9 +341,26 @@ export function Scoreboard({
                                     </div>
                                     
                                     <div>
-                                        <div className="font-semibold text-lg leading-none mb-1">
-                                            {player.name} {isMe && <span className="text-xs font-normal text-[var(--muted-foreground)]">(You)</span>}
-                                            {isLast && isGameEnded && <span className="ml-2 text-2xl">🏳️‍🌈</span>}
+                                        <div className="font-semibold text-lg leading-none mb-1 flex items-center gap-2">
+                                            {player.name} 
+                                            {isMe && <span className="text-xs font-normal text-[var(--muted-foreground)]">(You)</span>}
+                                            {isLast && isGameEnded && <span className="text-2xl">🏳️‍🌈</span>}
+
+                                            {/* W/L Indicators */}
+                                            <div className="flex gap-0.5 ml-1">
+                                                {history.map((isWin: boolean, i: number) => (
+                                                    <span 
+                                                        key={i} 
+                                                        className={`text-[10px] font-bold px-1 rounded-sm ${
+                                                            isWin 
+                                                                ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+                                                                : 'bg-red-500/20 text-red-600 dark:text-red-400'
+                                                        }`}
+                                                    >
+                                                        {isWin ? 'W' : 'L'}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </div>
                                         {/* Current Round Stats */}
                                         {activeRound && (

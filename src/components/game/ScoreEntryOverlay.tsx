@@ -461,25 +461,11 @@ export function ScoreEntryOverlay({
                                                 onKeyDown={(e) => handleKeyDown(e, index)}
                                                 className="w-20 h-14 bg-[var(--background)] border border-[var(--border)] rounded-xl text-center text-2xl font-bold focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all touch-manipulation"
                                             />
-                                                {isDealer && validDealerBids.length > 0 && (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-xs text-[var(--muted-foreground)]">Valid:</span>
-                                                        <div className="flex gap-1">
-                                                            {validDealerBids.map((bid) => (
-                                                                <button
-                                                                    key={bid}
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setInputs(prev => ({ ...prev, [p.email]: bid }));
-                                                                        setError(null);
-                                                                    }}
-                                                                    className="w-7 h-7 text-xs font-medium bg-[var(--primary)]/20 text-[var(--primary)] rounded hover:bg-[var(--primary)]/30 transition-colors flex items-center justify-center touch-manipulation"
-                                                                    title={`Bid ${bid}`}
-                                                                >
-                                                                    {bid}
-                                                                </button>
-                                                            ))}
-                                                        </div>
+                                                {isDealer && (
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        <span className="text-xs font-bold text-red-500">
+                                                            Cannot bid: {invalidDealerBid}
+                                                        </span>
                                                     </div>
                                                 )}
                                             </div>

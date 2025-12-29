@@ -39,7 +39,7 @@ describe('ScoreEntryOverlay - Dealer Bid Hint', () => {
     (global.fetch as jest.Mock).mockClear();
   });
 
-  it('should show valid dealer bids next to dealer input when entering bids', async () => {
+  it('should show "Cannot bid" message for dealer instead of valid bid buttons', async () => {
     render(
       <ScoreEntryOverlay
         isOpen={true}
@@ -54,114 +54,21 @@ describe('ScoreEntryOverlay - Dealer Bid Hint', () => {
       expect(screen.getByText(/Enter Bids/i)).toBeInTheDocument();
     });
 
-    // Should show valid bid numbers (0, 1, 2) as clickable buttons next to dealer
-    // Invalid bid would be 3 (would make total = 3)
-    expect(screen.getByText('Valid:')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '0' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
-  });
-
-  it('should update valid dealer bids when other players enter bids', async () => {
-    render(
-      <ScoreEntryOverlay
-        isOpen={true}
-        onClose={mockOnClose}
-        gameId="game1"
-        gameState={mockGameState}
-        onGameUpdate={mockOnGameUpdate}
-      />
-    );
-
-    // Wait for overlay to be fully rendered
-    await waitFor(() => {
-      expect(screen.getByText(/Enter Bids/i)).toBeInTheDocument();
-    });
-
-    // Initially should show valid bids: 0, 1, 2 (not 3)
-    expect(screen.getByRole('button', { name: '0' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
-
-    // Find all number inputs (bids)
+    // Enter bids for non-dealer players to make the sum 2
+    // cardsPerPlayer = 3. Sum of others = 2.
+    // Invalid dealer bid = 3 - 2 = 1.
     const inputs = screen.getAllByRole('spinbutton');
+    if (inputs[0]) fireEvent.change(inputs[0], { target: { value: '1' } }); // Player 1
+    if (inputs[1]) fireEvent.change(inputs[1], { target: { value: '1' } }); // Player 2
+    if (inputs[2]) fireEvent.change(inputs[2], { target: { value: '0' } }); // Player 3
     
-    // Enter bids for non-dealer players (first 3 players)
-    if (inputs[0]) fireEvent.change(inputs[0], { target: { value: '1' } });
-    if (inputs[1]) fireEvent.change(inputs[1], { target: { value: '1' } });
-    if (inputs[2]) fireEvent.change(inputs[2], { target: { value: '0' } });
-
-    // Should update valid bids (cardsPerPlayer = 3, sum of others = 2, so dealer can bid 0, 2, or 3, but NOT 1 because 2+1=3)
-    // Valid bids: 0, 2, 3 (anything except 1)
+    // Check for the red warning message
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '0' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '3' })).toBeInTheDocument();
-      // Should not show bid 1
-      const bid1Buttons = screen.queryAllByRole('button', { name: '1' });
-      // Only the input field should have value 1, not a valid bid button
-      expect(bid1Buttons.length).toBeLessThanOrEqual(1);
+       // Expect text "Cannot bid: 1"
+       expect(screen.getByText(/Cannot bid: 1/i)).toBeInTheDocument();
+       // Should NOT show "Valid:" list
+       expect(screen.queryByText('Valid:')).not.toBeInTheDocument();
     });
-  });
-
-  it('should allow clicking valid bid numbers to set dealer bid', async () => {
-    render(
-      <ScoreEntryOverlay
-        isOpen={true}
-        onClose={mockOnClose}
-        gameId="game1"
-        gameState={mockGameState}
-        onGameUpdate={mockOnGameUpdate}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/Enter Bids/i)).toBeInTheDocument();
-    });
-
-    // Find the valid bid button for 2
-    const bid2Button = screen.getByRole('button', { name: '2' });
-    fireEvent.click(bid2Button);
-
-    // The dealer's input should now have value 2
-    const inputs = screen.getAllByRole('spinbutton');
-    const dealerInput = inputs[inputs.length - 1]; // Dealer is last
-    expect(dealerInput).toHaveValue(2);
-  });
-
-  it('should not show valid bids when entering tricks', () => {
-    const tricksGameState = {
-      ...mockGameState,
-      rounds: [
-        {
-          index: 1,
-          cards: 3,
-          trump: 'S',
-          state: 'PLAYING',
-          bids: {
-            'p1@test.com': 1,
-            'p2@test.com': 1,
-            'p3@test.com': 0,
-            'dealer@test.com': 1,
-          },
-          tricks: {},
-        },
-      ],
-    };
-
-    render(
-      <ScoreEntryOverlay
-        isOpen={true}
-        onClose={mockOnClose}
-        gameId="game1"
-        gameState={tricksGameState}
-        onGameUpdate={mockOnGameUpdate}
-      />
-    );
-
-    expect(screen.getByText(/Enter Tricks/i)).toBeInTheDocument();
-    // Should not show valid bids when entering tricks
-    expect(screen.queryByText('Valid:')).not.toBeInTheDocument();
   });
 });
 
@@ -295,4 +202,3 @@ describe('ScoreEntryOverlay - Game End', () => {
         expect(finalRound?.state).toBe('COMPLETED');
     });
 });
-

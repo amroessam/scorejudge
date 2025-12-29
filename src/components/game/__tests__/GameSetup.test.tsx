@@ -1,0 +1,162 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { GameSetup } from '@/components/game/GameSetup';
+import type { GameState } from '@/lib/store';
+
+// Mock dnd-kit
+jest.mock('@dnd-kit/core', () => ({
+  ...jest.requireActual('@dnd-kit/core'),
+  DndContext: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useSensor: jest.fn(),
+  useSensors: jest.fn(),
+  PointerSensor: jest.fn(),
+  KeyboardSensor: jest.fn(),
+}));
+
+jest.mock('@dnd-kit/sortable', () => ({
+  ...jest.requireActual('@dnd-kit/sortable'),
+  SortableContext: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: jest.fn(),
+    transform: null,
+    transition: null,
+    isDragging: false,
+  }),
+}));
+
+// Mock fetch
+global.fetch = jest.fn();
+
+describe('GameSetup', () => {
+  const mockGameState: GameState = {
+    id: 'game1',
+    name: 'Test Game',
+    players: [
+      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, image: 'old-image.jpg' },
+      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
+      { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+    ],
+    rounds: [],
+    currentRoundIndex: 0,
+    ownerEmail: 'p1@test.com',
+    lastUpdated: Date.now(),
+  };
+
+  const defaultProps = {
+    gameId: 'game1',
+    gameState: mockGameState,
+    isOwner: true,
+    isJoined: true,
+    currentUserEmail: 'p1@test.com',
+    onGameUpdate: jest.fn(),
+    onJoin: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (global.fetch as jest.Mock).mockClear();
+  });
+
+  it('should allow image upload for current user when clicking avatar', async () => {
+    render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+
+    // Hidden file input should be present
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+
+    // Find the avatar for Player 1 (Current User)
+    // We can find it by finding the image with src 'old-image.jpg'
+    const avatar = screen.getByAltText('Player 1');
+    const avatarContainer = avatar.closest('.group');
+    
+    // Simulate clicking the avatar to trigger file input click
+    // Since we can't easily spy on fileInput.click() in JSDOM, we'll verify the event handler logic
+    // But we can simulate the file change event which is what actually triggers the upload
+    
+    const file = new File(['(⌐□_□)'], 'new_avatar.png', { type: 'image/png' });
+    Object.defineProperty(fileInput, 'files', {
+      value: [file]
+    });
+    
+    fireEvent.change(fileInput);
+    
+    await waitFor(() => {
+        // It should call the API to upload
+        expect(global.fetch).toHaveBeenCalledWith(
+            expect.stringContaining('/api/games/game1/players'),
+            expect.objectContaining({
+                method: 'PATCH',
+                body: expect.stringContaining('"image":'),
+            })
+        );
+    });
+  });
+
+  it('should toggle dealer when owner clicks OTHER player avatar', () => {
+    render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+
+    // Find avatar for Player 2 (Not current user)
+    // Player 2 has no image, so it renders a div with 'P' (from initials)
+    // We need to find the specific container
+    const player2Container = screen.getByText('Player 2').closest('.bg-\\[var\\(--card\\)\\]');
+    // Find the avatar inside this container. It's the div with class 'relative group cursor-pointer'
+    const avatarContainer = player2Container?.querySelector('.relative.group.cursor-pointer');
+    
+    expect(avatarContainer).toBeInTheDocument();
+    
+    if (avatarContainer) {
+        fireEvent.click(avatarContainer);
+        
+        // Should trigger API call to set dealer
+        expect(global.fetch).toHaveBeenCalledWith(
+            expect.stringContaining('/api/games/game1'),
+            expect.objectContaining({
+                method: 'PATCH',
+                body: expect.stringContaining('firstDealerEmail'),
+            })
+        );
+    }
+  });
+
+  it('should NOT toggle dealer when owner clicks OWN avatar', () => {
+      // This is because clicking own avatar should trigger image upload
+      render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+      
+      const avatar = screen.getByAltText('Player 1');
+      const avatarContainer = avatar.closest('.group');
+      
+      if (avatarContainer) {
+          fireEvent.click(avatarContainer);
+          
+          // Should NOT trigger API call to set dealer (which targets /api/games/game1 PATCH)
+          // It MIGHT trigger image upload if we continued, but we're checking it DOESN'T set dealer
+          expect(global.fetch).not.toHaveBeenCalledWith(
+              expect.stringContaining('/api/games/game1'),
+              expect.objectContaining({
+                  body: expect.stringContaining('firstDealerEmail'),
+              })
+          );
+      }
+  });
+  
+  it('should show explicit "Make First Dealer" button for owner on own card', () => {
+      render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+      
+      const makeDealerButtons = screen.getAllByText('Make First Dealer');
+      // Should exist for multiple players, let's click the first one (Player 1's)
+      expect(makeDealerButtons.length).toBeGreaterThan(0);
+      
+      fireEvent.click(makeDealerButtons[0]);
+      
+      // Should trigger API call to set dealer
+      expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/games/game1'),
+          expect.objectContaining({
+              method: 'PATCH',
+              body: expect.stringContaining('"firstDealerEmail":"p1@test.com"'),
+          })
+      );
+  });
+});
+

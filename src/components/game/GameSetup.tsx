@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { 
     DndContext, 
     closestCenter, 
@@ -25,7 +25,8 @@ import {
     User, 
     Crown, 
     Loader2,
-    LogIn
+    LogIn,
+    Upload
 } from "lucide-react";
 import { Player } from "@/lib/store";
 
@@ -47,6 +48,7 @@ function SortablePlayerItem({
     firstDealerEmail, 
     onToggleDealer, 
     onNameUpdate,
+    onUploadImage,
     isGameStarted,
 }: { 
     player: Player, 
@@ -56,6 +58,7 @@ function SortablePlayerItem({
     onToggleDealer: (email: string) => void,
     onNameUpdate: (name: string) => void,
     onDelete: (email: string) => void,
+    onUploadImage: () => void,
     isGameStarted: boolean,
 }) {
     const {
@@ -115,21 +118,40 @@ function SortablePlayerItem({
 
             {/* Avatar / Dealer Indicator */}
             <div 
-                className="relative"
-                onClick={() => isOwner && onToggleDealer(player.email)}
+                className="relative group cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (isCurrentUser) {
+                        onUploadImage();
+                    } else if (isOwner) {
+                        onToggleDealer(player.email);
+                    }
+                }}
             >
                 {player.image ? (
-                    <img 
-                        src={player.image} 
-                        alt={player.name}
-                        className={`w-10 h-10 rounded-full object-cover ${isFirstDealer ? 'ring-2 ring-[var(--primary)]' : ''}`}
-                    />
+                    <>
+                        <img 
+                            src={player.image} 
+                            alt={player.name}
+                            className={`w-10 h-10 rounded-full object-cover ${isFirstDealer ? 'ring-2 ring-[var(--primary)]' : ''}`}
+                        />
+                        {isCurrentUser && (
+                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Upload size={16} className="text-white" />
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className={`
-                        w-10 h-10 rounded-full flex items-center justify-center
+                        w-10 h-10 rounded-full flex items-center justify-center relative
                         ${isFirstDealer ? 'bg-[var(--primary)] text-white' : 'bg-[var(--secondary)] text-[var(--muted-foreground)]'}
                     `}>
                         {isFirstDealer ? <Crown size={20} fill="currentColor" /> : <User size={20} />}
+                        {isCurrentUser && (
+                            <div className="absolute inset-0 bg-black/10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Upload size={16} className="text-[var(--foreground)]" />
+                            </div>
+                        )}
                     </div>
                 )}
                 {isFirstDealer && (
@@ -158,7 +180,22 @@ function SortablePlayerItem({
                         {player.name} {isCurrentUser && <span className="text-xs text-[var(--muted-foreground)] font-normal">(You)</span>}
                     </div>
                 )}
-                {isFirstDealer && <div className="text-xs text-[var(--primary)] font-medium">First Dealer</div>}
+                
+                {/* Dealer Status / Toggle */}
+                {isOwner ? (
+                    <button 
+                        onClick={() => onToggleDealer(player.email)}
+                        className={`text-xs font-medium flex items-center gap-1 hover:underline ${isFirstDealer ? 'text-[var(--primary)]' : 'text-[var(--muted-foreground)] hover:text-[var(--primary)]'}`}
+                    >
+                        {isFirstDealer ? (
+                            <>First Dealer <Crown size={10} /></>
+                        ) : (
+                            "Make First Dealer"
+                        )}
+                    </button>
+                ) : (
+                    isFirstDealer && <div className="text-xs text-[var(--primary)] font-medium">First Dealer</div>
+                )}
             </div>
         </div>
     );
@@ -176,6 +213,7 @@ export function GameSetup({
     const [copied, setCopied] = useState(false);
     const [starting, setStarting] = useState(false);
     const [joining, setJoining] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // DnD Sensors
     const sensors = useSensors(
@@ -315,11 +353,49 @@ export function GameSetup({
         }
     };
 
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Reset the input value so the same file can be selected again if needed
+        e.target.value = '';
+
+        // Basic validation
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            alert("Image is too large. Please choose an image under 5MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            const base64String = reader.result as string;
+            try {
+                await fetch(`/api/games/${gameId}/players`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64String })
+                });
+            } catch (err) {
+                console.error("Failed to upload image", err);
+                alert("Failed to update profile picture");
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
     const players = gameState.players || [];
     const canStart = players.length >= 3;
 
     return (
         <div className="flex flex-col h-full overflow-hidden bg-[var(--background)]">
+            <input 
+                type="file" 
+                ref={fileInputRef}
+                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, overflow: 'hidden' }}
+                accept="image/*"
+                onChange={handleFileChange}
+            />
+
             {/* Header */}
             <div className="text-center space-y-2 pt-6 pb-4 px-4 shrink-0 z-10 bg-[var(--background)]">
                 <h2 className="text-3xl font-bold tracking-tight">{gameState.name}</h2>
@@ -361,6 +437,11 @@ export function GameSetup({
                                     onToggleDealer={handleToggleDealer}
                                     onNameUpdate={handleNameUpdate}
                                     onDelete={() => {}}
+                                    onUploadImage={() => {
+                                        if (fileInputRef.current) {
+                                            fileInputRef.current.click();
+                                        }
+                                    }}
                                     isGameStarted={gameState.currentRoundIndex > 0}
                                 />
                             ))}

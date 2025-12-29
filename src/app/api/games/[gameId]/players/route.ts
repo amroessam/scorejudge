@@ -28,9 +28,9 @@ export async function PATCH(
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
     
-    const { name } = body;
-    if (!name || typeof name !== 'string') {
-        return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    const { name, image } = body;
+    if (!name && !image) {
+        return NextResponse.json({ error: "Name or Image is required" }, { status: 400 });
     }
 
     // Resolve game ID
@@ -52,7 +52,7 @@ export async function PATCH(
     }
 
     // Check if game has started - name changes are only allowed before the game starts
-    if (game.currentRoundIndex > 0) {
+    if (name && game.currentRoundIndex > 0) {
         return NextResponse.json({ 
             error: "Name cannot be changed after the game has started" 
         }, { status: 400 });
@@ -64,8 +64,9 @@ export async function PATCH(
         return NextResponse.json({ error: "Player not found in game" }, { status: 404 });
     }
 
-    // Update name
-    game.players[playerIndex].name = name;
+    // Update fields
+    if (name) game.players[playerIndex].name = name;
+    if (image) game.players[playerIndex].image = image;
     
     // Save to store
     setGame(actualGameId, game);
@@ -87,4 +88,3 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, game });
 }
-
