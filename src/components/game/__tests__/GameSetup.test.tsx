@@ -105,14 +105,11 @@ describe('GameSetup', () => {
     });
   });
 
-  it('should toggle dealer when owner clicks OTHER player avatar', () => {
+  it('should change dealer when owner clicks OTHER player avatar', () => {
     render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
 
     // Find avatar for Player 2 (Not current user)
-    // Player 2 has no image, so it renders a div with 'P' (from initials)
-    // We need to find the specific container
     const player2Container = screen.getByText('Player 2').closest('.bg-\\[var\\(--card\\)\\]');
-    // Find the avatar inside this container. It's the div with class 'relative group cursor-pointer'
     const avatarContainer = player2Container?.querySelector('.relative.group.cursor-pointer');
     
     expect(avatarContainer).toBeInTheDocument();
@@ -120,19 +117,18 @@ describe('GameSetup', () => {
     if (avatarContainer) {
         fireEvent.click(avatarContainer);
         
-        // Should trigger API call to set dealer
+        // Should trigger API call to set dealer to Player 2
         expect(global.fetch).toHaveBeenCalledWith(
             expect.stringContaining('/api/games/game1'),
             expect.objectContaining({
                 method: 'PATCH',
-                body: expect.stringContaining('firstDealerEmail'),
+                body: expect.stringContaining('"firstDealerEmail":"p2@test.com"'),
             })
         );
     }
   });
 
-  it('should NOT toggle dealer when owner clicks OWN avatar', () => {
-      // This is because clicking own avatar should trigger image upload
+  it('should NOT change dealer when owner clicks OWN avatar (triggers image upload instead)', () => {
       render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
       
       const avatar = screen.getByAltText('Player 1');
@@ -141,8 +137,7 @@ describe('GameSetup', () => {
       if (avatarContainer) {
           fireEvent.click(avatarContainer);
           
-          // Should NOT trigger API call to set dealer (which targets /api/games/game1 PATCH)
-          // It MIGHT trigger image upload if we continued, but we're checking it DOESN'T set dealer
+          // Should NOT trigger API call to set dealer
           expect(global.fetch).not.toHaveBeenCalledWith(
               expect.stringContaining('/api/games/game1'),
               expect.objectContaining({
@@ -152,23 +147,24 @@ describe('GameSetup', () => {
       }
   });
   
-  it('should show explicit "Make First Dealer" button for owner on own card', () => {
-      render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+  it('should auto-select first player as dealer (no explicit button needed)', () => {
+      // No explicit firstDealerEmail set - first player should be the default dealer
+      const gameStateNoDealer = { ...mockGameState, firstDealerEmail: undefined };
+      render(<GameSetup {...defaultProps} gameState={gameStateNoDealer} currentUserEmail="p1@test.com" />);
       
-      const makeDealerButtons = screen.getAllByText('Make First Dealer');
-      // Should exist for multiple players, let's click the first one (Player 1's)
-      expect(makeDealerButtons.length).toBeGreaterThan(0);
+      // First player should show "First Dealer" label
+      expect(screen.getByText('First Dealer')).toBeInTheDocument();
       
-      fireEvent.click(makeDealerButtons[0]);
+      // There should be NO "Make First Dealer" buttons
+      expect(screen.queryByText('Make First Dealer')).not.toBeInTheDocument();
+  });
+  
+  it('should show "First Dealer" label on explicitly set dealer', () => {
+      const gameStateWithDealer = { ...mockGameState, firstDealerEmail: 'p2@test.com' };
+      render(<GameSetup {...defaultProps} gameState={gameStateWithDealer} currentUserEmail="p1@test.com" />);
       
-      // Should trigger API call to set dealer
-      expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/api/games/game1'),
-          expect.objectContaining({
-              method: 'PATCH',
-              body: expect.stringContaining('"firstDealerEmail":"p1@test.com"'),
-          })
-      );
+      // Player 2 should show "First Dealer" label
+      expect(screen.getByText('First Dealer')).toBeInTheDocument();
   });
 });
 

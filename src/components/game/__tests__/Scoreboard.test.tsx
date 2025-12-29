@@ -23,19 +23,8 @@ jest.mock('next-auth/react', () => ({
   useSession: () => mockUseSession(),
 }));
 
-// Mock fetch for image upload
+// Mock fetch
 global.fetch = jest.fn();
-
-// Mock react-easy-crop
-jest.mock('react-easy-crop', () => {
-    const React = require('react');
-    return function MockCropper({ onCropComplete }: { onCropComplete: (croppedArea: any, croppedAreaPixels: any) => void }) {
-        React.useEffect(() => {
-            onCropComplete({ x: 0, y: 0, width: 100, height: 100 }, { x: 0, y: 0, width: 200, height: 200 });
-        }, [onCropComplete]);
-        return <div data-testid="mock-cropper">Mock Cropper</div>;
-    };
-});
 
 describe('Scoreboard', () => {
   const mockGameState: GameState = {
@@ -89,42 +78,13 @@ describe('Scoreboard', () => {
     expect(screen.getByText('Round 1')).toBeInTheDocument();
   });
   
-  // NEW TEST: Image Upload opens cropper
-  it('should open cropper when image is selected for upload', async () => {
+  // Image upload is only available in the lobby (GameSetup), not during the game
+  it('should NOT have file input for image upload during game', () => {
       const { container } = render(<Scoreboard {...defaultProps} currentUserEmail="p1@test.com" />);
       
-      // Hidden file input should be present
-      const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(fileInput).toBeInTheDocument();
-      
-      // Simulate file selection with FileReader mock
-      const file = new File(['(⌐□_□)'], 'cool_avatar.png', { type: 'image/png' });
-      
-      // Mock FileReader that triggers callback synchronously
-      const mockFileReaderInstance = {
-        readAsDataURL: jest.fn(function(this: any) {
-            // Synchronously call onloadend
-            if (this.onloadend) {
-                this.onloadend();
-            }
-        }),
-        onloadend: null as any,
-        result: 'data:image/png;base64,testimage'
-      };
-      jest.spyOn(window, 'FileReader').mockImplementation(() => mockFileReaderInstance as any);
-      
-      Object.defineProperty(fileInput, 'files', {
-        value: [file]
-      });
-      
-      await waitFor(async () => {
-          fireEvent.change(fileInput);
-      });
-      
-      await waitFor(() => {
-          // Image cropper should open
-          expect(screen.getByText('Crop Photo')).toBeInTheDocument();
-      });
+      // Hidden file input should NOT be present during game
+      const fileInput = container.querySelector('input[type="file"]');
+      expect(fileInput).not.toBeInTheDocument();
   });
 
   // NEW TEST: Win/Loss Indicators

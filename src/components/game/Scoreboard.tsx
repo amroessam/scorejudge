@@ -1,22 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { 
-    Trophy, 
-    History, 
     Settings, 
     Plus, 
     Undo2, 
     Crown,
     Home,
     Sparkles,
-    ArrowRight,
-    Upload
+    ArrowRight
 } from "lucide-react";
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
-import { ImageCropperOverlay } from "./ImageCropperOverlay";
 import { DECK_SIZE } from "@/lib/config";
 import confetti from "canvas-confetti";
 
@@ -82,9 +78,7 @@ export function Scoreboard({
     onNextRound
 }: ScoreboardProps) {
     const router = useRouter();
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-    const [cropperImage, setCropperImage] = useState<string | null>(null);
     const { players, currentRoundIndex, rounds, firstDealerEmail } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
     
@@ -155,59 +149,10 @@ export function Scoreboard({
         }
     }, [isGameEnded, isWinner]);
 
-    const handleAvatarClick = (player: Player, e: React.MouseEvent) => {
-        if (player.email === currentUserEmail) {
-            e.stopPropagation(); // Prevent opening history overlay
-            if (fileInputRef.current) {
-                fileInputRef.current.click();
-            }
-        }
-    };
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        // Reset the input value so the same file can be selected again if needed
-        e.target.value = '';
-
-        // Basic validation
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit for cropping (will be reduced after)
-            alert("Image is too large. Please choose an image under 10MB.");
-            return;
-        }
-
-        // Read the file and open cropper
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result as string;
-            setCropperImage(base64String);
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleCropComplete = async (croppedImageBase64: string) => {
-        try {
-            await fetch(`/api/games/${gameId}/players`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: croppedImageBase64 })
-            });
-        } catch (err) {
-            console.error("Failed to upload image", err);
-            alert("Failed to update profile picture");
-        }
-    };
+    // Profile picture upload is only available in the lobby (GameSetup), not during the game
 
     return (
         <div className="flex flex-col h-full bg-[var(--background)] overflow-hidden">
-             <input 
-                type="file" 
-                ref={fileInputRef}
-                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, overflow: 'hidden' }}
-                accept="image/*"
-                onChange={handleFileChange}
-            />
 
             {/* Winner Confetti Overlay - only visible to winner */}
             {isGameEnded && isWinner && (
@@ -311,34 +256,16 @@ export function Scoreboard({
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {/* Avatar/Dealer Chip */}
-                                    <div 
-                                        className="relative group shrink-0"
-                                        onClick={(e) => handleAvatarClick(player, e)}
-                                    >
+                                    <div className="relative shrink-0">
                                         {player.image ? (
-                                            <>
-                                                <img 
-                                                    src={player.image} 
-                                                    alt={player.name}
-                                                    className="w-10 h-10 rounded-full object-cover"
-                                                />
-                                                {isMe && (
-                                                    <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                        <Upload size={14} className="text-white" />
-                                                    </div>
-                                                )}
-                                            </>
+                                            <img 
+                                                src={player.image} 
+                                                alt={player.name}
+                                                className="w-10 h-10 rounded-full object-cover"
+                                            />
                                         ) : (
-                                            <div className={`
-                                                w-10 h-10 rounded-full flex items-center justify-center font-bold relative
-                                                bg-[var(--secondary)] text-[var(--muted-foreground)]
-                                            `}>
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-[var(--secondary)] text-[var(--muted-foreground)]">
                                                 {player.name.charAt(0)}
-                                                {isMe && (
-                                                    <div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                        <Upload size={14} className="text-[var(--foreground)]" />
-                                                    </div>
-                                                )}
                                             </div>
                                         )}
                                         {isDealer && (
@@ -487,13 +414,6 @@ export function Scoreboard({
                 onClose={() => setSelectedPlayer(null)} 
                 player={selectedPlayer}
                 rounds={rounds}
-            />
-
-            <ImageCropperOverlay
-                isOpen={!!cropperImage}
-                imageSrc={cropperImage || ''}
-                onClose={() => setCropperImage(null)}
-                onCropComplete={handleCropComplete}
             />
         </div>
     );

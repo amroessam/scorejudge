@@ -46,7 +46,7 @@ function SortablePlayerItem({
     player, 
     isOwner, 
     isCurrentUser, 
-    firstDealerEmail, 
+    effectiveDealerEmail, 
     onToggleDealer, 
     onNameUpdate,
     onUploadImage,
@@ -55,7 +55,7 @@ function SortablePlayerItem({
     player: Player, 
     isOwner: boolean, 
     isCurrentUser: boolean, 
-    firstDealerEmail?: string,
+    effectiveDealerEmail: string,
     onToggleDealer: (email: string) => void,
     onNameUpdate: (name: string) => void,
     onDelete: (email: string) => void,
@@ -95,7 +95,7 @@ function SortablePlayerItem({
         }
     };
 
-    const isFirstDealer = firstDealerEmail === player.email;
+    const isFirstDealer = effectiveDealerEmail === player.email;
 
     return (
         <div 
@@ -182,20 +182,11 @@ function SortablePlayerItem({
                     </div>
                 )}
                 
-                {/* Dealer Status / Toggle */}
-                {isOwner ? (
-                    <button 
-                        onClick={() => onToggleDealer(player.email)}
-                        className={`text-xs font-medium flex items-center gap-1 hover:underline ${isFirstDealer ? 'text-[var(--primary)]' : 'text-[var(--muted-foreground)] hover:text-[var(--primary)]'}`}
-                    >
-                        {isFirstDealer ? (
-                            <>First Dealer <Crown size={10} /></>
-                        ) : (
-                            "Make First Dealer"
-                        )}
-                    </button>
-                ) : (
-                    isFirstDealer && <div className="text-xs text-[var(--primary)] font-medium">First Dealer</div>
+                {/* Dealer Status - Only show for current dealer */}
+                {isFirstDealer && (
+                    <div className="text-xs text-[var(--primary)] font-medium flex items-center gap-1">
+                        First Dealer <Crown size={10} />
+                    </div>
                 )}
             </div>
         </div>
@@ -277,17 +268,19 @@ export function GameSetup({
     };
 
     const handleToggleDealer = async (email: string) => {
-        // Optimistic
-        const isCurrentlyDealer = gameState.firstDealerEmail === email;
-        const newDealer = isCurrentlyDealer ? undefined : email;
+        // Always set to the clicked player (no toggle off - first player is default)
+        // If clicking the current dealer, do nothing
+        const effectiveDealer = gameState.firstDealerEmail || gameState.players[0]?.email;
+        if (effectiveDealer === email) return;
         
-        onGameUpdate({ ...gameState, firstDealerEmail: newDealer });
+        // Optimistic update
+        onGameUpdate({ ...gameState, firstDealerEmail: email });
 
         // API Call
         await fetch(`/api/games/${gameId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ firstDealerEmail: newDealer })
+            body: JSON.stringify({ firstDealerEmail: email })
         });
     };
 
@@ -434,24 +427,28 @@ export function GameSetup({
                         strategy={verticalListSortingStrategy}
                     >
                         <div className="space-y-3">
-                            {players.map((player: Player) => (
-                                <SortablePlayerItem 
-                                    key={player.email} 
-                                    player={player}
-                                    isOwner={isOwner}
-                                    isCurrentUser={player.email === currentUserEmail}
-                                    firstDealerEmail={gameState.firstDealerEmail}
-                                    onToggleDealer={handleToggleDealer}
-                                    onNameUpdate={handleNameUpdate}
-                                    onDelete={() => {}}
-                                    onUploadImage={() => {
-                                        if (fileInputRef.current) {
-                                            fileInputRef.current.click();
-                                        }
-                                    }}
-                                    isGameStarted={gameState.currentRoundIndex > 0}
-                                />
-                            ))}
+                            {players.map((player: Player) => {
+                                // Calculate effective dealer (default to first player if not set)
+                                const effectiveDealerEmail = gameState.firstDealerEmail || players[0]?.email;
+                                return (
+                                    <SortablePlayerItem 
+                                        key={player.email} 
+                                        player={player}
+                                        isOwner={isOwner}
+                                        isCurrentUser={player.email === currentUserEmail}
+                                        effectiveDealerEmail={effectiveDealerEmail}
+                                        onToggleDealer={handleToggleDealer}
+                                        onNameUpdate={handleNameUpdate}
+                                        onDelete={() => {}}
+                                        onUploadImage={() => {
+                                            if (fileInputRef.current) {
+                                                fileInputRef.current.click();
+                                            }
+                                        }}
+                                        isGameStarted={gameState.currentRoundIndex > 0}
+                                    />
+                                );
+                            })}
                         </div>
                     </SortableContext>
                 </DndContext>
