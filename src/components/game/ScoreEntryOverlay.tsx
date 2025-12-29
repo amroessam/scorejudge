@@ -96,10 +96,28 @@ export function ScoreEntryOverlay({
     
     // Refs for focus management (only for bids)
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    
+    // Track if inputs have been initialized for the current open session
+    // This prevents re-initialization when gameState changes via WebSocket
+    const hasInitializedRef = useRef(false);
+    const lastOpenStateRef = useRef(false);
 
-    // Initialize inputs when opening
+    // Initialize inputs ONLY when overlay first opens, not on every gameState change
     useEffect(() => {
-        if (isOpen && activeRound) {
+        // Detect when overlay opens (transition from closed to open)
+        const justOpened = isOpen && !lastOpenStateRef.current;
+        lastOpenStateRef.current = isOpen;
+        
+        // Reset initialization flag when overlay closes
+        if (!isOpen) {
+            hasInitializedRef.current = false;
+            return;
+        }
+        
+        // Only initialize if we just opened and haven't initialized yet
+        if (justOpened && !hasInitializedRef.current && activeRound) {
+            hasInitializedRef.current = true;
+            
             const initial: Record<string, number | string> = {};
             players.forEach((p: Player) => {
                 if (type === 'BIDS') {
@@ -313,8 +331,11 @@ export function ScoreEntryOverlay({
                     }, 500);
                 }
             }
-        } catch (e) {
-            setError("Network error");
+        } catch (e: any) {
+            // Show more specific error message if available
+            const errorMessage = e?.message || "Network error - please check your connection";
+            setError(errorMessage);
+            console.error("[ScoreEntryOverlay] Submit error:", e);
         } finally {
             setLoading(false);
         }

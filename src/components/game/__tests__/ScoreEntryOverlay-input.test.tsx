@@ -157,5 +157,98 @@ describe('ScoreEntryOverlay - Bid Input Handling', () => {
     fireEvent.change(input, { target: { value: '02' } });
     expect(input).toHaveValue(2);
   });
+
+  it('should NOT reset user-entered bids when gameState changes (WebSocket update)', async () => {
+    const { rerender } = render(
+      <ScoreEntryOverlay
+        isOpen={true}
+        onClose={mockOnClose}
+        gameId="game1"
+        gameState={mockGameState}
+        onGameUpdate={mockOnGameUpdate}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Enter Bids/i)).toBeInTheDocument();
+    });
+
+    const inputs = screen.getAllByRole('spinbutton');
+    
+    // User enters bids
+    fireEvent.change(inputs[0], { target: { value: '2' } });
+    fireEvent.change(inputs[1], { target: { value: '1' } });
+    
+    expect(inputs[0]).toHaveValue(2);
+    expect(inputs[1]).toHaveValue(1);
+
+    // Simulate WebSocket update - gameState changes but round is still BIDDING with no bids
+    const updatedGameState = {
+      ...mockGameState,
+      lastUpdated: Date.now() + 1000, // Different timestamp
+      players: [
+        ...mockGameState.players,
+      ],
+    };
+
+    // Re-render with new gameState (simulating WebSocket update)
+    rerender(
+      <ScoreEntryOverlay
+        isOpen={true}
+        onClose={mockOnClose}
+        gameId="game1"
+        gameState={updatedGameState}
+        onGameUpdate={mockOnGameUpdate}
+      />
+    );
+
+    // Inputs should STILL have the user-entered values, NOT be reset to empty
+    expect(inputs[0]).toHaveValue(2);
+    expect(inputs[1]).toHaveValue(1);
+  });
+
+  it('should preserve user inputs when overlay stays open and round changes reference', async () => {
+    const { rerender } = render(
+      <ScoreEntryOverlay
+        isOpen={true}
+        onClose={mockOnClose}
+        gameId="game1"
+        gameState={mockGameState}
+        onGameUpdate={mockOnGameUpdate}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Enter Bids/i)).toBeInTheDocument();
+    });
+
+    const inputs = screen.getAllByRole('spinbutton');
+    
+    // User enters a bid
+    fireEvent.change(inputs[0], { target: { value: '3' } });
+    expect(inputs[0]).toHaveValue(3);
+
+    // Simulate a state update where the rounds array is a new reference
+    // but the round data is the same (common with immutable state updates)
+    const updatedGameState = {
+      ...mockGameState,
+      rounds: [
+        { ...mockGameState.rounds[0] }, // New object, same data
+      ],
+    };
+
+    rerender(
+      <ScoreEntryOverlay
+        isOpen={true}
+        onClose={mockOnClose}
+        gameId="game1"
+        gameState={updatedGameState}
+        onGameUpdate={mockOnGameUpdate}
+      />
+    );
+
+    // User's input should be preserved
+    expect(inputs[0]).toHaveValue(3);
+  });
 });
 

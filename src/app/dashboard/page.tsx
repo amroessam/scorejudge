@@ -55,6 +55,27 @@ export default function Dashboard() {
         }
     }, [session, status, router]);
 
+    // Helper function to fetch discoverable games
+    const fetchDiscoverableGames = () => {
+        fetch("/api/games/discover")
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error('Failed to fetch discoverable games');
+                }
+                return res.json();
+            })
+            .then((data: DiscoverableGame[]) => {
+                if (Array.isArray(data)) {
+                    setDiscoverableGames(data);
+                }
+                setLoadingDiscoverable(false);
+            })
+            .catch((err) => {
+                console.error('Error fetching discoverable games:', err);
+                setLoadingDiscoverable(false);
+            });
+    };
+
     // Fetch games on mount
     useEffect(() => {
         if (session) {
@@ -86,24 +107,21 @@ export default function Dashboard() {
                 });
 
             // Fetch discoverable games
-            fetch("/api/games/discover")
-                .then((res) => {
-                    if (!res.ok) {
-                        throw new Error('Failed to fetch discoverable games');
-                    }
-                    return res.json();
-                })
-                .then((data: DiscoverableGame[]) => {
-                    if (Array.isArray(data)) {
-                        setDiscoverableGames(data);
-                    }
-                    setLoadingDiscoverable(false);
-                })
-                .catch((err) => {
-                    console.error('Error fetching discoverable games:', err);
-                    setLoadingDiscoverable(false);
-                });
+            fetchDiscoverableGames();
         }
+    }, [session]);
+
+    // Periodic refresh of discoverable games as fallback for WebSocket failures
+    // This ensures users see new games even if their WebSocket connection is unstable
+    useEffect(() => {
+        if (!session) return;
+
+        // Refresh discoverable games every 30 seconds as a fallback
+        const refreshInterval = setInterval(() => {
+            fetchDiscoverableGames();
+        }, 30000);
+
+        return () => clearInterval(refreshInterval);
     }, [session]);
 
     // WebSocket connection for discovery updates
