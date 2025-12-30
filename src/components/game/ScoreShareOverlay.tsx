@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Player } from '@/lib/store';
-import { X, Share2, Spade, Club } from 'lucide-react';
+import { X, Share2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ScoreShareOverlayProps {
@@ -31,12 +31,11 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
         
         setCapturing(true);
         try {
-            // Wait for images to load if any (though we use emojis mainly)
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             const canvas = await html2canvas(shareRef.current, {
-                backgroundColor: '#1a1a2e',
-                scale: 2, // Higher quality
+                backgroundColor: '#0f0f0f',
+                scale: 2,
                 useCORS: true,
                 logging: false,
                 allowTaint: true
@@ -44,7 +43,6 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
 
             const imageUrl = canvas.toDataURL('image/png');
 
-            // Try native sharing first (mobile)
             if (navigator.share) {
                 try {
                     const blob = await (await fetch(imageUrl)).blob();
@@ -64,7 +62,6 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                 }
             }
 
-            // Fallback: Download image
             const link = document.createElement('a');
             link.download = `scorejudge-${gameName.replace(/\s+/g, '-').toLowerCase()}.png`;
             link.href = imageUrl;
@@ -93,76 +90,83 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                     </button>
                 </div>
 
-                {/* Share Preview Content - Scrollable */}
-                <div className="flex-1 overflow-y-auto p-6 bg-[var(--background)] flex items-center justify-center">
+                {/* Share Preview Content */}
+                <div className="flex-1 overflow-y-auto p-4 bg-[var(--background)] flex items-center justify-center">
                     
-                    {/* The Card to be Captured - Using inline styles for html2canvas compatibility */}
+                    {/* The Card to be Captured */}
                     <div 
                         ref={shareRef}
                         style={{
-                            width: '320px',
-                            maxWidth: '100%',
-                            backgroundColor: '#1a1a2e',
+                            width: '340px',
+                            padding: '24px 20px',
+                            backgroundColor: '#0f0f0f',
                             borderRadius: '24px',
-                            padding: '32px 24px',
-                            position: 'relative',
-                            overflow: 'hidden',
+                            fontFamily: 'system-ui, -apple-system, sans-serif',
                         }}
                     >
-                        {/* Decorative Background Elements */}
-                        <div style={{ position: 'absolute', top: '-20px', right: '-20px', opacity: 0.08 }}>
-                            <Spade size={140} color="#ffffff" />
-                        </div>
-                        <div style={{ position: 'absolute', bottom: '-20px', left: '-20px', opacity: 0.08 }}>
-                            <Club size={140} color="#ffffff" />
-                        </div>
-
-                        {/* Logo / Header */}
-                        <div style={{ textAlign: 'center', marginBottom: '24px', position: 'relative', zIndex: 10 }}>
-                            <h2 style={{ 
-                                fontSize: '2rem', 
-                                fontWeight: 'bold', 
+                        {/* Header with Logo */}
+                        <div style={{ 
+                            textAlign: 'center', 
+                            marginBottom: '20px',
+                        }}>
+                            {/* SCOREJUDGE Title with 3D effect */}
+                            <div style={{
+                                fontSize: '28px',
+                                fontWeight: '900',
+                                letterSpacing: '3px',
                                 color: '#a78bfa',
-                                letterSpacing: '0.08em',
-                                marginBottom: '8px',
-                                margin: 0,
-                                fontFamily: 'system-ui, sans-serif',
-                                textShadow: '0 0 20px rgba(167, 139, 250, 0.3)'
+                                textShadow: '0 2px 0 #7c3aed, 0 4px 0 #5b21b6, 0 6px 8px rgba(0,0,0,0.4)',
+                                marginBottom: '6px',
                             }}>
                                 SCOREJUDGE
-                            </h2>
-                            <p style={{ 
-                                fontSize: '0.875rem', 
-                                color: '#9ca3af', 
-                                fontWeight: '400', 
-                                textTransform: 'uppercase', 
-                                letterSpacing: '0.15em',
-                                margin: '8px 0 0 0'
+                            </div>
+                            
+                            {/* Game Name */}
+                            <div style={{
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                color: '#a1a1aa',
+                                letterSpacing: '2px',
+                                textTransform: 'uppercase',
                             }}>
                                 {gameName.toUpperCase()}
-                            </p>
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '12px' }}>
-                                <span style={{ opacity: 0.4, fontSize: '12px' }}>♠</span>
-                                <span style={{ opacity: 0.4, fontSize: '12px', color: '#ef4444' }}>♥</span>
-                                <span style={{ opacity: 0.4, fontSize: '12px' }}>♣</span>
-                                <span style={{ opacity: 0.4, fontSize: '12px', color: '#ef4444' }}>♦</span>
+                            </div>
+                            
+                            {/* Card Suits */}
+                            <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                gap: '8px', 
+                                marginTop: '10px',
+                                fontSize: '14px',
+                            }}>
+                                <span style={{ color: '#818cf8' }}>♠</span>
+                                <span style={{ color: '#f87171' }}>♥</span>
+                                <span style={{ color: '#4ade80' }}>♣</span>
+                                <span style={{ color: '#fbbf24' }}>♦</span>
                             </div>
                         </div>
 
-                        {/* Score List */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', zIndex: 10 }}>
+                        {/* Player Cards */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {sortedPlayers.map((player, index) => {
                                 const isWinner = index === 0;
                                 const isLast = index === sortedPlayers.length - 1 && sortedPlayers.length > 1;
                                 const medal = getPositionIndicator(index, sortedPlayers.length);
 
-                                const cardBg = isWinner 
-                                    ? '#3d3d1f'
-                                    : '#2d2d3d';
+                                // Card styling based on position
+                                let cardBg = '#1c1c1e';
+                                let cardBorder = '1px solid #2c2c2e';
+                                let cardShadow = 'none';
                                 
-                                const cardBorder = isWinner 
-                                    ? '2px solid #a3a33a'
-                                    : '1px solid #3d3d4d';
+                                if (isWinner) {
+                                    cardBg = 'linear-gradient(135deg, #3d3d00 0%, #2a2a00 100%)';
+                                    cardBorder = '2px solid #ca8a04';
+                                    cardShadow = '0 4px 12px rgba(202, 138, 4, 0.3), inset 0 1px 0 rgba(255,255,255,0.1)';
+                                } else if (isLast) {
+                                    cardBg = 'linear-gradient(135deg, #2d1f3d 0%, #1f1f2e 100%)';
+                                    cardBorder = '1px solid #7c3aed';
+                                }
 
                                 return (
                                     <div 
@@ -172,22 +176,32 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                             alignItems: 'center',
                                             justifyContent: 'space-between',
                                             padding: '14px 16px',
-                                            borderRadius: '14px',
+                                            borderRadius: '16px',
+                                            background: cardBg,
                                             border: cardBorder,
-                                            backgroundColor: cardBg,
+                                            boxShadow: cardShadow,
                                         }}
                                     >
+                                        {/* Left side: Medal + Avatar + Name */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            {/* Rank / Medal */}
+                                            {/* Medal/Position */}
                                             <div style={{ 
                                                 width: '28px', 
                                                 height: '28px', 
                                                 display: 'flex', 
                                                 alignItems: 'center', 
-                                                justifyContent: 'center', 
-                                                fontSize: '1.1rem' 
+                                                justifyContent: 'center',
+                                                fontSize: '20px',
                                             }}>
-                                                {medal || <span style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: 'bold' }}>#{index + 1}</span>}
+                                                {medal || (
+                                                    <span style={{ 
+                                                        color: '#71717a', 
+                                                        fontSize: '12px', 
+                                                        fontWeight: '700' 
+                                                    }}>
+                                                        #{index + 1}
+                                                    </span>
+                                                )}
                                             </div>
                                             
                                             {/* Avatar */}
@@ -201,7 +215,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                                             height: '44px', 
                                                             borderRadius: '50%', 
                                                             objectFit: 'cover',
-                                                            backgroundColor: '#4a4a5a'
+                                                            border: isWinner ? '2px solid #eab308' : '2px solid #3f3f46',
                                                         }} 
                                                     />
                                                 ) : (
@@ -209,38 +223,47 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                                         width: '44px', 
                                                         height: '44px', 
                                                         borderRadius: '50%', 
-                                                        backgroundColor: '#4a4a5a', 
+                                                        backgroundColor: '#27272a', 
                                                         display: 'flex', 
                                                         alignItems: 'center', 
                                                         justifyContent: 'center', 
-                                                        fontWeight: 'bold', 
-                                                        color: '#d1d5db',
-                                                        fontSize: '1.1rem'
+                                                        fontWeight: '700', 
+                                                        color: '#a1a1aa',
+                                                        fontSize: '18px',
+                                                        border: isWinner ? '2px solid #eab308' : '2px solid #3f3f46',
+                                                        textShadow: isWinner ? '0 1px 2px rgba(0,0,0,0.5)' : 'none',
                                                     }}>
                                                         {player.name.charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
+                                                {/* Crown for winner */}
                                                 {isWinner && (
                                                     <div style={{ 
                                                         position: 'absolute', 
-                                                        top: '-10px', 
+                                                        top: '-12px', 
                                                         left: '50%',
-                                                        transform: 'translateX(-50%)'
+                                                        transform: 'translateX(-50%)',
+                                                        fontSize: '16px',
+                                                        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))',
                                                     }}>
-                                                        <span style={{ fontSize: '1rem' }}>👑</span>
+                                                        👑
                                                     </div>
                                                 )}
                                             </div>
 
-                                            {/* Name */}
+                                            {/* Player Name */}
                                             <div style={{ 
+                                                fontWeight: '700',
+                                                fontSize: '16px',
+                                                letterSpacing: '0.5px',
                                                 color: isWinner ? '#fde047' : '#ffffff',
-                                                fontWeight: '600',
-                                                fontSize: '1rem',
+                                                textShadow: isWinner 
+                                                    ? '0 1px 0 #a16207, 0 2px 4px rgba(0,0,0,0.3)' 
+                                                    : '0 1px 2px rgba(0,0,0,0.3)',
                                                 maxWidth: '120px',
                                                 overflow: 'hidden',
                                                 textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
+                                                whiteSpace: 'nowrap',
                                             }}>
                                                 {player.name}
                                             </div>
@@ -248,10 +271,14 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
 
                                         {/* Score */}
                                         <div style={{ 
-                                            fontSize: '1.75rem', 
-                                            fontWeight: 'bold', 
+                                            fontSize: '28px', 
+                                            fontWeight: '800',
                                             fontFamily: 'system-ui, sans-serif',
-                                            color: isWinner ? '#fde047' : '#ffffff'
+                                            color: isWinner ? '#fde047' : '#ffffff',
+                                            textShadow: isWinner 
+                                                ? '0 2px 0 #a16207, 0 4px 8px rgba(0,0,0,0.4)' 
+                                                : '0 2px 4px rgba(0,0,0,0.3)',
+                                            letterSpacing: '-1px',
                                         }}>
                                             {player.score}
                                         </div>
@@ -261,17 +288,21 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                         </div>
 
                         {/* Footer */}
-                        <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                        <div style={{ 
+                            marginTop: '20px', 
+                            textAlign: 'center',
+                        }}>
                             <div style={{ 
                                 display: 'inline-block', 
-                                padding: '6px 16px', 
-                                borderRadius: '9999px', 
-                                backgroundColor: 'rgba(255, 255, 255, 0.08)', 
+                                padding: '6px 14px', 
+                                borderRadius: '20px', 
+                                backgroundColor: '#1c1c1e',
+                                border: '1px solid #2c2c2e',
                                 fontSize: '10px', 
-                                color: '#9ca3af', 
-                                fontFamily: 'system-ui, sans-serif', 
-                                letterSpacing: '0.12em',
-                                textTransform: 'uppercase'
+                                fontWeight: '600',
+                                color: '#71717a', 
+                                letterSpacing: '1.5px',
+                                textTransform: 'uppercase',
                             }}>
                                 PLAYED ON SCOREJUDGE
                             </div>
@@ -284,7 +315,10 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                     <button
                         onClick={handleShare}
                         disabled={capturing}
-                        className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="w-full py-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                        style={{
+                            boxShadow: '0 4px 0 #5b21b6, 0 6px 12px rgba(0,0,0,0.3)',
+                        }}
                     >
                         {capturing ? (
                             <>Generating...</>
@@ -303,4 +337,3 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
         </div>
     );
 }
-
