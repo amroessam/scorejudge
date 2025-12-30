@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle, Users, LogIn } from "lucide-react";
+import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle, Users, LogIn, Spade, Heart, Club, Diamond } from "lucide-react";
 
 interface GameFile {
     id: string;
@@ -362,13 +362,31 @@ export default function Dashboard() {
         <div className="min-h-screen p-6 max-w-4xl mx-auto space-y-8">
             <header className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                        Dashboard
-                    </h1>
-                    <p className="text-muted-foreground">Discover and manage your ScoreJudge sessions.</p>
+                    <div className="flex items-center gap-3 mb-1">
+                        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 font-[family-name:var(--font-russo)] tracking-wider drop-shadow-sm">
+                            SCOREJUDGE
+                        </h1>
+                        <div className="flex gap-1 ml-1">
+                            <Spade size={18} className="text-indigo-400 fill-indigo-400/20" />
+                            <Heart size={18} className="text-rose-400 fill-rose-400/20" />
+                            <Club size={18} className="text-emerald-400 fill-emerald-400/20" />
+                            <Diamond size={18} className="text-amber-400 fill-amber-400/20" />
+                        </div>
+                    </div>
+                    <p className="text-muted-foreground font-medium">Live scorekeeper for Judgement</p>
                 </div>
-                <Link href="/create" className="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition">
-                    <Plus size={18} /> New Game
+                
+                <Link 
+                    href="/create" 
+                    className="relative group px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-indigo-500/25"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                    <div className="absolute inset-0 border border-white/20 rounded-xl" />
+                    <span className="relative flex items-center gap-2 font-bold text-white tracking-wide">
+                        <Plus size={20} strokeWidth={3} /> 
+                        <span className="font-[family-name:var(--font-russo)]">NEW GAME</span>
+                    </span>
                 </Link>
             </header>
 

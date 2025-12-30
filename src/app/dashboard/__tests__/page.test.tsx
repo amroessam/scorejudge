@@ -101,7 +101,7 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Dashboard/i)).toBeInTheDocument();
+      expect(screen.getByText(/SCOREJUDGE/i)).toBeInTheDocument();
     });
 
     expect(mockReplace).not.toHaveBeenCalled();

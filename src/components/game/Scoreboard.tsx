@@ -8,7 +8,8 @@ import {
     Crown,
     Home,
     Sparkles,
-    ArrowRight
+    ArrowRight,
+    CheckCircle
 } from "lucide-react";
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
@@ -187,11 +188,14 @@ export function Scoreboard({
                 <div className="flex justify-between items-center">
                     <div>
                         <h2 className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
-                            {isGameEnded ? 'Game Ended' : `Round ${currentRoundIndex}`}
+                            {isGameEnded ? 'Game Status' : `Round ${currentRoundIndex}`}
                         </h2>
                         {isGameEnded ? (
-                            <div className="text-lg font-bold text-green-400">
-                                Final Round ({finalRoundNumber}) Completed
+                            <div className="flex flex-col items-start mt-1">
+                                <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                                    <CheckCircle size={14} strokeWidth={2.5} />
+                                    FINAL ROUND ({finalRoundNumber}) COMPLETED
+                                </div>
                             </div>
                         ) : activeRound && (
                             <div className="flex items-center gap-2 text-xl font-bold">
@@ -278,14 +282,14 @@ export function Scoreboard({
                                     <div className="min-w-0 flex-1">
                                         {/* Player Name Row */}
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="font-semibold text-lg leading-tight">
+                                            <span className="font-[family-name:var(--font-russo)] text-lg leading-tight tracking-wide">
                                                 {player.name}
                                             </span>
                                             {positionIndicator && (
                                                 <span className="text-base">{positionIndicator}</span>
                                             )}
                                             {isMe && (
-                                                <span className="text-xs font-normal text-[var(--muted-foreground)]">(You)</span>
+                                                <span className="text-xs font-normal text-[var(--muted-foreground)] font-sans">(You)</span>
                                             )}
                                         </div>
                                         
@@ -400,9 +404,9 @@ export function Scoreboard({
                         {!isGameEnded && (
                             <button 
                                 onClick={onOpenSettings}
-                                className="p-3 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
+                                className="p-3 rounded-full bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] hover:border-[var(--primary)]/30 active:scale-95 transition-all touch-manipulation shadow-sm"
                             >
-                                <Settings size={24} />
+                                <Settings size={22} />
                             </button>
                         )}
                     </div>
