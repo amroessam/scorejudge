@@ -171,6 +171,7 @@ function SortablePlayerItem({
                         onChange={(e) => setName(e.target.value)}
                         onBlur={handleSaveName}
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                        maxLength={12}
                         className="w-full bg-transparent border-b border-[var(--primary)] outline-none text-[var(--foreground)] font-medium p-0"
                     />
                 ) : (

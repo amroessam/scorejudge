@@ -9,11 +9,13 @@ import {
     Home,
     Sparkles,
     ArrowRight,
-    CheckCircle
+    CheckCircle,
+    Share2
 } from "lucide-react";
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
+import { ScoreShareOverlay } from "./ScoreShareOverlay";
 import { DECK_SIZE } from "@/lib/config";
 import confetti from "canvas-confetti";
 
@@ -80,7 +82,8 @@ export function Scoreboard({
 }: ScoreboardProps) {
     const router = useRouter();
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-    const { players, currentRoundIndex, rounds, firstDealerEmail } = gameState;
+    const [showShare, setShowShare] = useState(false);
+    const { players, currentRoundIndex, rounds, firstDealerEmail, name: gameName } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
     
     // Calculate final round and check if game ended
@@ -359,24 +362,33 @@ export function Scoreboard({
                         
                         {/* Primary Action */}
                         {isGameEnded ? (
-                            <>
-                                {/* Create New Game Button */}
+                            <div className="flex flex-col gap-2 w-full">
+                                <div className="flex gap-2">
+                                    {/* Create New Game Button */}
+                                    <button 
+                                        onClick={handleCreateNewGame}
+                                        className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
+                                    >
+                                        <Sparkles size={20} />
+                                        New Game
+                                    </button>
+                                    {/* Dashboard Button */}
+                                    <button 
+                                        onClick={handleGoToDashboard}
+                                        className="bg-[var(--secondary)] text-[var(--foreground)] px-6 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
+                                    >
+                                        <Home size={20} />
+                                    </button>
+                                </div>
+                                {/* Share Button */}
                                 <button 
-                                    onClick={handleCreateNewGame}
-                                    className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
+                                    onClick={() => setShowShare(true)}
+                                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
-                                    <Sparkles size={20} />
-                                    New Game
+                                    <Share2 size={20} />
+                                    Share Results
                                 </button>
-                                {/* Dashboard Button */}
-                                <button 
-                                    onClick={handleGoToDashboard}
-                                    className="flex-1 bg-[var(--secondary)] text-[var(--foreground)] py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
-                                >
-                                    <Home size={20} />
-                                    Dashboard
-                                </button>
-                            </>
+                            </div>
                         ) : isOwner ? (
                             activeRound?.state === 'COMPLETED' && !isGameEnded ? (
                                 <button 
@@ -418,6 +430,13 @@ export function Scoreboard({
                 onClose={() => setSelectedPlayer(null)} 
                 player={selectedPlayer}
                 rounds={rounds}
+            />
+            
+            <ScoreShareOverlay
+                isOpen={showShare}
+                onClose={() => setShowShare(false)}
+                players={players}
+                gameName={gameName || 'Judgement Game'}
             />
         </div>
     );
