@@ -62,11 +62,15 @@ function getFinalRoundNumber(numPlayers: number): number {
 }
 
 // Helper to get position medal/emoji
-function getPositionIndicator(position: number, totalPlayers: number, isGameEnded: boolean): string | null {
+function getPositionIndicator(position: number, totalPlayers: number, currentRoundIndex: number): string | null {
+    // No medals in round 1 (everyone starts at 0)
+    if (currentRoundIndex <= 1) return null;
+
     if (position === 0) return '🥇'; // Gold - 1st place
     if (position === 1) return '🥈'; // Silver - 2nd place
-    if (position === 2) return '🥉'; // Bronze - 3rd place
-    if (position === totalPlayers - 1 && isGameEnded) return '🏳️‍🌈'; // Last place (only when game ended)
+    if (position === totalPlayers - 1) return '🏳️‍🌈'; // Last place gets flag (overrides Bronze if 3 players)
+    if (position === 2) return '🥉'; // Bronze - 3rd place (only if not last)
+    
     return null;
 }
 
@@ -232,7 +236,7 @@ export function Scoreboard({
                     const isDealer = player.email === dealer?.email;
                     const isMe = player.email === currentUserEmail;
                     const isLast = index === sortedPlayers.length - 1 && isGameEnded;
-                    const positionIndicator = getPositionIndicator(index, sortedPlayers.length, isGameEnded);
+                    const positionIndicator = getPositionIndicator(index, sortedPlayers.length, currentRoundIndex);
                     
                     const bid = activeRound?.bids?.[player.email];
                     const tricks = activeRound?.tricks?.[player.email];
