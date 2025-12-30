@@ -126,25 +126,75 @@ describe('Scoreboard', () => {
       expect(screen.getByText('L')).toBeInTheDocument();
   });
 
-  // NEW TEST: Medal indicators for ranked players
-  it('should display medal emojis for top 3 players', () => {
+  // NEW TEST: Medal indicators for ranked players (only from round 2 onwards)
+  it('should display medal emojis for top players from round 2 onwards', () => {
       const rankedGameState = {
           ...mockGameState,
+          currentRoundIndex: 2, // Round 2 - medals should show
           players: [
               { id: '1', name: 'First', email: 'p1@test.com', score: 100 },
               { id: '2', name: 'Second', email: 'p2@test.com', score: 80 },
               { id: '3', name: 'Third', email: 'p3@test.com', score: 60 },
               { id: '4', name: 'Fourth', email: 'p4@test.com', score: 40 },
           ],
-          rounds: [{ index: 1, cards: 5, trump: 'S', state: 'BIDDING', bids: {}, tricks: {} }],
+          rounds: [
+              { index: 1, cards: 5, trump: 'S', state: 'COMPLETED', bids: {}, tricks: {} },
+              { index: 2, cards: 5, trump: 'D', state: 'BIDDING', bids: {}, tricks: {} }
+          ],
       };
       
       render(<Scoreboard {...defaultProps} gameState={rankedGameState} />);
       
-      // Gold, Silver, Bronze medals
+      // Gold, Silver, Bronze medals (4 players = 1st Gold, 2nd Silver, 3rd Bronze, 4th Flag)
       expect(screen.getByText('🥇')).toBeInTheDocument();
       expect(screen.getByText('🥈')).toBeInTheDocument();
       expect(screen.getByText('🥉')).toBeInTheDocument();
+      expect(screen.getByText('🏳️‍🌈')).toBeInTheDocument();
+  });
+
+  it('should NOT display medal emojis in round 1', () => {
+      const round1GameState = {
+          ...mockGameState,
+          currentRoundIndex: 1, // Round 1 - no medals
+          players: [
+              { id: '1', name: 'First', email: 'p1@test.com', score: 0 },
+              { id: '2', name: 'Second', email: 'p2@test.com', score: 0 },
+              { id: '3', name: 'Third', email: 'p3@test.com', score: 0 },
+          ],
+          rounds: [{ index: 1, cards: 5, trump: 'S', state: 'BIDDING', bids: {}, tricks: {} }],
+      };
+      
+      render(<Scoreboard {...defaultProps} gameState={round1GameState} />);
+      
+      // No medals should be shown
+      expect(screen.queryByText('🥇')).not.toBeInTheDocument();
+      expect(screen.queryByText('🥈')).not.toBeInTheDocument();
+      expect(screen.queryByText('🥉')).not.toBeInTheDocument();
+      expect(screen.queryByText('🏳️‍🌈')).not.toBeInTheDocument();
+  });
+
+  it('should show flag instead of bronze for 3rd player when only 3 players', () => {
+      const threePlayerGameState = {
+          ...mockGameState,
+          currentRoundIndex: 2, // Round 2
+          players: [
+              { id: '1', name: 'First', email: 'p1@test.com', score: 100 },
+              { id: '2', name: 'Second', email: 'p2@test.com', score: 80 },
+              { id: '3', name: 'Third', email: 'p3@test.com', score: 60 },
+          ],
+          rounds: [
+              { index: 1, cards: 5, trump: 'S', state: 'COMPLETED', bids: {}, tricks: {} },
+              { index: 2, cards: 5, trump: 'D', state: 'BIDDING', bids: {}, tricks: {} }
+          ],
+      };
+      
+      render(<Scoreboard {...defaultProps} gameState={threePlayerGameState} />);
+      
+      // 3 players: 1st Gold, 2nd Silver, 3rd Flag (no Bronze)
+      expect(screen.getByText('🥇')).toBeInTheDocument();
+      expect(screen.getByText('🥈')).toBeInTheDocument();
+      expect(screen.queryByText('🥉')).not.toBeInTheDocument();
+      expect(screen.getByText('🏳️‍🌈')).toBeInTheDocument();
   });
 
   // NEW TEST: W/L indicators should wrap when many rounds
