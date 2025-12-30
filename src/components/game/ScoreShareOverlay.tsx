@@ -33,8 +33,10 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
         try {
             await new Promise(resolve => setTimeout(resolve, 300));
 
+            // html2canvas doesn't support oklab() colors from Tailwind CSS 4
+            // All colors in shareRef use explicit hex/rgb values
             const canvas = await html2canvas(shareRef.current, {
-                backgroundColor: '#0f0f0f',
+                backgroundColor: '#0a0a0a',
                 scale: 2,
                 useCORS: true,
                 logging: false,
@@ -93,52 +95,57 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                 {/* Share Preview Content */}
                 <div className="flex-1 overflow-y-auto p-4 bg-[var(--background)] flex items-center justify-center">
                     
-                    {/* The Card to be Captured */}
+                    {/* 
+                        The Card to be Captured 
+                        IMPORTANT: html2canvas doesn't support oklab() from Tailwind CSS 4
+                        All colors MUST use explicit hex/rgb values, NOT CSS variables or Tailwind classes
+                    */}
                     <div 
                         ref={shareRef}
                         style={{
-                            width: '340px',
-                            padding: '24px 20px',
-                            backgroundColor: '#0f0f0f',
-                            borderRadius: '24px',
+                            width: '320px',
+                            padding: '28px 20px',
+                            backgroundColor: '#0a0a0a',
+                            borderRadius: '20px',
+                            border: '1px solid #262626',
                             fontFamily: 'system-ui, -apple-system, sans-serif',
                         }}
                     >
-                        {/* Header with Logo */}
+                        {/* Header */}
                         <div style={{ 
                             textAlign: 'center', 
-                            marginBottom: '20px',
+                            marginBottom: '24px',
                         }}>
                             {/* SCOREJUDGE Title with 3D effect */}
                             <div style={{
-                                fontSize: '28px',
-                                fontWeight: '900',
-                                letterSpacing: '3px',
+                                fontSize: '26px',
+                                fontWeight: '800',
+                                letterSpacing: '2px',
                                 color: '#a78bfa',
-                                textShadow: '0 2px 0 #7c3aed, 0 4px 0 #5b21b6, 0 6px 8px rgba(0,0,0,0.4)',
-                                marginBottom: '6px',
+                                textShadow: '0 2px 0 #7c3aed, 0 3px 0 #5b21b6, 0 4px 8px rgba(0,0,0,0.5)',
+                                marginBottom: '8px',
                             }}>
                                 SCOREJUDGE
                             </div>
                             
                             {/* Game Name */}
                             <div style={{
-                                fontSize: '14px',
+                                fontSize: '13px',
                                 fontWeight: '500',
                                 color: '#a1a1aa',
-                                letterSpacing: '2px',
+                                letterSpacing: '1.5px',
                                 textTransform: 'uppercase',
+                                marginBottom: '12px',
                             }}>
                                 {gameName.toUpperCase()}
                             </div>
                             
-                            {/* Card Suits */}
+                            {/* Card Suits - using explicit hex colors */}
                             <div style={{ 
                                 display: 'flex', 
                                 justifyContent: 'center', 
-                                gap: '8px', 
-                                marginTop: '10px',
-                                fontSize: '14px',
+                                gap: '10px', 
+                                fontSize: '16px',
                             }}>
                                 <span style={{ color: '#818cf8' }}>♠</span>
                                 <span style={{ color: '#f87171' }}>♥</span>
@@ -147,138 +154,127 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                             </div>
                         </div>
 
-                        {/* Player Cards */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {/* Player Cards - using explicit hex/rgb colors only */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {sortedPlayers.map((player, index) => {
                                 const isWinner = index === 0;
                                 const isLast = index === sortedPlayers.length - 1 && sortedPlayers.length > 1;
                                 const medal = getPositionIndicator(index, sortedPlayers.length);
 
-                                // Card styling based on position
-                                let cardBg = '#1c1c1e';
-                                let cardBorder = '1px solid #2c2c2e';
-                                let cardShadow = 'none';
-                                
-                                if (isWinner) {
-                                    cardBg = 'linear-gradient(135deg, #3d3d00 0%, #2a2a00 100%)';
-                                    cardBorder = '2px solid #ca8a04';
-                                    cardShadow = '0 4px 12px rgba(202, 138, 4, 0.3), inset 0 1px 0 rgba(255,255,255,0.1)';
-                                } else if (isLast) {
-                                    cardBg = 'linear-gradient(135deg, #2d1f3d 0%, #1f1f2e 100%)';
-                                    cardBorder = '1px solid #7c3aed';
-                                }
+                                // Explicit hex colors for html2canvas compatibility
+                                const cardStyles: React.CSSProperties = {
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: '12px 14px',
+                                    borderRadius: '14px',
+                                    backgroundColor: isWinner ? '#332800' : isLast ? '#1f1528' : '#171717',
+                                    border: isWinner 
+                                        ? '2px solid #ca8a04' 
+                                        : isLast 
+                                            ? '1px solid #7c3aed' 
+                                            : '1px solid #262626',
+                                    boxShadow: isWinner ? '0 4px 12px rgba(202, 138, 4, 0.25)' : 'none',
+                                };
 
                                 return (
-                                    <div 
-                                        key={player.email}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            padding: '14px 16px',
-                                            borderRadius: '16px',
-                                            background: cardBg,
-                                            border: cardBorder,
-                                            boxShadow: cardShadow,
-                                        }}
-                                    >
-                                        {/* Left side: Medal + Avatar + Name */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            {/* Medal/Position */}
-                                            <div style={{ 
-                                                width: '28px', 
-                                                height: '28px', 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                justifyContent: 'center',
-                                                fontSize: '20px',
-                                            }}>
-                                                {medal || (
-                                                    <span style={{ 
-                                                        color: '#71717a', 
-                                                        fontSize: '12px', 
-                                                        fontWeight: '700' 
-                                                    }}>
-                                                        #{index + 1}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            
-                                            {/* Avatar */}
-                                            <div style={{ position: 'relative' }}>
-                                                {player.image ? (
-                                                    <img 
-                                                        src={player.image} 
-                                                        alt="" 
-                                                        style={{ 
-                                                            width: '44px', 
-                                                            height: '44px', 
-                                                            borderRadius: '50%', 
-                                                            objectFit: 'cover',
-                                                            border: isWinner ? '2px solid #eab308' : '2px solid #3f3f46',
-                                                        }} 
-                                                    />
-                                                ) : (
-                                                    <div style={{ 
-                                                        width: '44px', 
-                                                        height: '44px', 
+                                    <div key={player.email} style={cardStyles}>
+                                        {/* Medal/Position - fixed width */}
+                                        <div style={{ 
+                                            width: '32px', 
+                                            height: '32px', 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            fontSize: '18px',
+                                            flexShrink: 0,
+                                        }}>
+                                            {medal || (
+                                                <span style={{ 
+                                                    color: '#71717a', 
+                                                    fontSize: '11px', 
+                                                    fontWeight: '700' 
+                                                }}>
+                                                    #{index + 1}
+                                                </span>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Avatar - fixed size */}
+                                        <div style={{ 
+                                            position: 'relative',
+                                            flexShrink: 0,
+                                            marginRight: '10px',
+                                        }}>
+                                            {player.image ? (
+                                                <img 
+                                                    src={player.image} 
+                                                    alt="" 
+                                                    style={{ 
+                                                        width: '40px', 
+                                                        height: '40px', 
                                                         borderRadius: '50%', 
-                                                        backgroundColor: '#27272a', 
-                                                        display: 'flex', 
-                                                        alignItems: 'center', 
-                                                        justifyContent: 'center', 
-                                                        fontWeight: '700', 
-                                                        color: '#a1a1aa',
-                                                        fontSize: '18px',
+                                                        objectFit: 'cover',
                                                         border: isWinner ? '2px solid #eab308' : '2px solid #3f3f46',
-                                                        textShadow: isWinner ? '0 1px 2px rgba(0,0,0,0.5)' : 'none',
-                                                    }}>
-                                                        {player.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                )}
-                                                {/* Crown for winner */}
-                                                {isWinner && (
-                                                    <div style={{ 
-                                                        position: 'absolute', 
-                                                        top: '-12px', 
-                                                        left: '50%',
-                                                        transform: 'translateX(-50%)',
-                                                        fontSize: '16px',
-                                                        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))',
-                                                    }}>
-                                                        👑
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Player Name */}
-                                            <div style={{ 
-                                                fontWeight: '700',
-                                                fontSize: '16px',
-                                                letterSpacing: '0.5px',
-                                                color: isWinner ? '#fde047' : '#ffffff',
-                                                textShadow: isWinner 
-                                                    ? '0 1px 0 #a16207, 0 2px 4px rgba(0,0,0,0.3)' 
-                                                    : '0 1px 2px rgba(0,0,0,0.3)',
-                                                maxWidth: '120px',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap',
-                                            }}>
-                                                {player.name}
-                                            </div>
+                                                    }} 
+                                                />
+                                            ) : (
+                                                <div style={{ 
+                                                    width: '40px', 
+                                                    height: '40px', 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: '#27272a', 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center', 
+                                                    fontWeight: '700', 
+                                                    color: '#d4d4d8',
+                                                    fontSize: '16px',
+                                                    border: isWinner ? '2px solid #eab308' : '2px solid #3f3f46',
+                                                }}>
+                                                    {player.name.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
+                                            {/* Crown for winner */}
+                                            {isWinner && (
+                                                <div style={{ 
+                                                    position: 'absolute', 
+                                                    top: '-10px', 
+                                                    left: '50%',
+                                                    transform: 'translateX(-50%)',
+                                                    fontSize: '14px',
+                                                }}>
+                                                    👑
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Score */}
+                                        {/* Player Name - flex grow, no truncation */}
                                         <div style={{ 
-                                            fontSize: '28px', 
-                                            fontWeight: '800',
-                                            fontFamily: 'system-ui, sans-serif',
+                                            flex: 1,
+                                            minWidth: 0,
+                                            fontWeight: '600',
+                                            fontSize: '15px',
+                                            letterSpacing: '0.3px',
+                                            color: isWinner ? '#fde047' : '#ffffff',
+                                            textShadow: isWinner ? '0 1px 2px rgba(0,0,0,0.4)' : 'none',
+                                            wordBreak: 'break-word',
+                                            lineHeight: '1.3',
+                                        }}>
+                                            {player.name}
+                                        </div>
+
+                                        {/* Score - fixed width, right aligned */}
+                                        <div style={{ 
+                                            fontSize: '24px', 
+                                            fontWeight: '700',
                                             color: isWinner ? '#fde047' : '#ffffff',
                                             textShadow: isWinner 
-                                                ? '0 2px 0 #a16207, 0 4px 8px rgba(0,0,0,0.4)' 
-                                                : '0 2px 4px rgba(0,0,0,0.3)',
-                                            letterSpacing: '-1px',
+                                                ? '0 2px 0 #a16207, 0 3px 6px rgba(0,0,0,0.4)' 
+                                                : '0 1px 3px rgba(0,0,0,0.3)',
+                                            marginLeft: '12px',
+                                            flexShrink: 0,
+                                            minWidth: '40px',
+                                            textAlign: 'right' as const,
                                         }}>
                                             {player.score}
                                         </div>
@@ -287,7 +283,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                             })}
                         </div>
 
-                        {/* Footer */}
+                        {/* Footer - explicit hex colors */}
                         <div style={{ 
                             marginTop: '20px', 
                             textAlign: 'center',
@@ -296,12 +292,12 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                 display: 'inline-block', 
                                 padding: '6px 14px', 
                                 borderRadius: '20px', 
-                                backgroundColor: '#1c1c1e',
-                                border: '1px solid #2c2c2e',
-                                fontSize: '10px', 
+                                backgroundColor: '#171717',
+                                border: '1px solid #262626',
+                                fontSize: '9px', 
                                 fontWeight: '600',
                                 color: '#71717a', 
-                                letterSpacing: '1.5px',
+                                letterSpacing: '1.2px',
                                 textTransform: 'uppercase',
                             }}>
                                 PLAYED ON SCOREJUDGE
