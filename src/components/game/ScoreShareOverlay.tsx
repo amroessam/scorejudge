@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Player } from '@/lib/store';
-import { X, Share2, Download, Spade, Heart, Club, Diamond } from 'lucide-react';
+import { X, Share2, Spade, Club } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ScoreShareOverlayProps {
@@ -35,7 +35,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
             await new Promise(resolve => setTimeout(resolve, 500));
 
             const canvas = await html2canvas(shareRef.current, {
-                backgroundColor: '#121212',
+                backgroundColor: '#1a1a2e',
                 scale: 2, // Higher quality
                 useCORS: true,
                 logging: false,
@@ -100,115 +100,159 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                     <div 
                         ref={shareRef}
                         style={{
-                            width: '100%',
-                            backgroundColor: '#1a1a1a',
-                            borderRadius: '16px',
-                            padding: '24px',
+                            width: '320px',
+                            maxWidth: '100%',
+                            backgroundColor: '#1a1a2e',
+                            borderRadius: '24px',
+                            padding: '32px 24px',
                             position: 'relative',
                             overflow: 'hidden',
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                            border: '1px solid rgba(255, 255, 255, 0.05)',
-                            backgroundImage: 'radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(0, 0, 0, 0) 50%)'
                         }}
                     >
                         {/* Decorative Background Elements */}
-                        <div style={{ position: 'absolute', top: 0, right: 0, padding: '16px', opacity: 0.05 }}>
-                            <Spade size={120} color="#ffffff" />
+                        <div style={{ position: 'absolute', top: '-20px', right: '-20px', opacity: 0.08 }}>
+                            <Spade size={140} color="#ffffff" />
                         </div>
-                        <div style={{ position: 'absolute', bottom: 0, left: 0, padding: '16px', opacity: 0.05 }}>
-                            <Heart size={120} color="#ffffff" />
+                        <div style={{ position: 'absolute', bottom: '-20px', left: '-20px', opacity: 0.08 }}>
+                            <Club size={140} color="#ffffff" />
                         </div>
 
                         {/* Logo / Header */}
-                        <div style={{ textAlign: 'center', marginBottom: '32px', position: 'relative', zIndex: 10 }}>
+                        <div style={{ textAlign: 'center', marginBottom: '24px', position: 'relative', zIndex: 10 }}>
                             <h2 style={{ 
-                                fontSize: '1.875rem', 
+                                fontSize: '2rem', 
                                 fontWeight: 'bold', 
-                                background: 'linear-gradient(to right, #60a5fa, #a855f7, #ec4899)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
-                                letterSpacing: '0.05em',
+                                color: '#a78bfa',
+                                letterSpacing: '0.08em',
                                 marginBottom: '8px',
-                                fontFamily: 'var(--font-russo), sans-serif'
+                                margin: 0,
+                                fontFamily: 'system-ui, sans-serif',
+                                textShadow: '0 0 20px rgba(167, 139, 250, 0.3)'
                             }}>
                                 SCOREJUDGE
                             </h2>
-                            <p style={{ fontSize: '0.875rem', color: '#9ca3af', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                {gameName}
+                            <p style={{ 
+                                fontSize: '0.875rem', 
+                                color: '#9ca3af', 
+                                fontWeight: '400', 
+                                textTransform: 'uppercase', 
+                                letterSpacing: '0.15em',
+                                margin: '8px 0 0 0'
+                            }}>
+                                {gameName.toUpperCase()}
                             </p>
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '12px', opacity: 0.5 }}>
-                                <Spade size={12} color="#818cf8" />
-                                <Heart size={12} color="#fb7185" />
-                                <Club size={12} color="#34d399" />
-                                <Diamond size={12} color="#fbbf24" />
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '12px' }}>
+                                <span style={{ opacity: 0.4, fontSize: '12px' }}>♠</span>
+                                <span style={{ opacity: 0.4, fontSize: '12px', color: '#ef4444' }}>♥</span>
+                                <span style={{ opacity: 0.4, fontSize: '12px' }}>♣</span>
+                                <span style={{ opacity: 0.4, fontSize: '12px', color: '#ef4444' }}>♦</span>
                             </div>
                         </div>
 
                         {/* Score List */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', zIndex: 10 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', zIndex: 10 }}>
                             {sortedPlayers.map((player, index) => {
                                 const isWinner = index === 0;
-                                const isLast = index === sortedPlayers.length - 1;
+                                const isLast = index === sortedPlayers.length - 1 && sortedPlayers.length > 1;
                                 const medal = getPositionIndicator(index, sortedPlayers.length);
 
-                                const cardStyle: React.CSSProperties = {
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '12px',
-                                    borderRadius: '12px',
-                                    border: isWinner 
-                                        ? '1px solid rgba(234, 179, 8, 0.3)' 
-                                        : isLast 
-                                            ? '1px solid rgba(255, 255, 255, 0.1)' 
-                                            : '1px solid rgba(255, 255, 255, 0.05)',
-                                    background: isWinner 
-                                        ? 'linear-gradient(to right, rgba(234, 179, 8, 0.2), rgba(245, 158, 11, 0.05))' 
-                                        : isLast 
-                                            ? 'linear-gradient(to right, rgba(239, 68, 68, 0.1), rgba(234, 179, 8, 0.1), rgba(59, 130, 246, 0.1))' 
-                                            : 'rgba(255, 255, 255, 0.05)',
-                                    position: 'relative',
-                                    overflow: 'hidden'
-                                };
+                                const cardBg = isWinner 
+                                    ? '#3d3d1f'
+                                    : '#2d2d3d';
+                                
+                                const cardBorder = isWinner 
+                                    ? '2px solid #a3a33a'
+                                    : '1px solid #3d3d4d';
 
                                 return (
                                     <div 
                                         key={player.email}
-                                        style={cardStyle}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '14px 16px',
+                                            borderRadius: '14px',
+                                            border: cardBorder,
+                                            backgroundColor: cardBg,
+                                        }}
                                     >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             {/* Rank / Medal */}
-                                            <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                                                {medal || <span style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: 'bold' }}>#{index + 1}</span>}
+                                            <div style={{ 
+                                                width: '28px', 
+                                                height: '28px', 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                fontSize: '1.1rem' 
+                                            }}>
+                                                {medal || <span style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: 'bold' }}>#{index + 1}</span>}
                                             </div>
                                             
                                             {/* Avatar */}
                                             <div style={{ position: 'relative' }}>
                                                 {player.image ? (
-                                                    <img src={player.image} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.1)' }} />
+                                                    <img 
+                                                        src={player.image} 
+                                                        alt="" 
+                                                        style={{ 
+                                                            width: '44px', 
+                                                            height: '44px', 
+                                                            borderRadius: '50%', 
+                                                            objectFit: 'cover',
+                                                            backgroundColor: '#4a4a5a'
+                                                        }} 
+                                                    />
                                                 ) : (
-                                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#9ca3af' }}>
-                                                        {player.name.charAt(0)}
+                                                    <div style={{ 
+                                                        width: '44px', 
+                                                        height: '44px', 
+                                                        borderRadius: '50%', 
+                                                        backgroundColor: '#4a4a5a', 
+                                                        display: 'flex', 
+                                                        alignItems: 'center', 
+                                                        justifyContent: 'center', 
+                                                        fontWeight: 'bold', 
+                                                        color: '#d1d5db',
+                                                        fontSize: '1.1rem'
+                                                    }}>
+                                                        {player.name.charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
                                                 {isWinner && (
-                                                    <div style={{ position: 'absolute', top: '-8px', right: '-8px', transform: 'rotate(12deg)' }}>
-                                                        <span style={{ fontSize: '1.25rem' }}>👑</span>
+                                                    <div style={{ 
+                                                        position: 'absolute', 
+                                                        top: '-10px', 
+                                                        left: '50%',
+                                                        transform: 'translateX(-50%)'
+                                                    }}>
+                                                        <span style={{ fontSize: '1rem' }}>👑</span>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Name */}
-                                            <div>
-                                                <div style={{ fontFamily: 'var(--font-russo), sans-serif', color: isWinner ? '#facc15' : '#ffffff' }}>
-                                                    {player.name}
-                                                </div>
+                                            <div style={{ 
+                                                color: isWinner ? '#fde047' : '#ffffff',
+                                                fontWeight: '600',
+                                                fontSize: '1rem',
+                                                maxWidth: '120px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {player.name}
                                             </div>
                                         </div>
 
                                         {/* Score */}
-                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'monospace', color: isWinner ? '#facc15' : '#ffffff' }}>
+                                        <div style={{ 
+                                            fontSize: '1.75rem', 
+                                            fontWeight: 'bold', 
+                                            fontFamily: 'system-ui, sans-serif',
+                                            color: isWinner ? '#fde047' : '#ffffff'
+                                        }}>
                                             {player.score}
                                         </div>
                                     </div>
@@ -217,17 +261,17 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                         </div>
 
                         {/* Footer */}
-                        <div style={{ marginTop: '32px', textAlign: 'center' }}>
+                        <div style={{ marginTop: '24px', textAlign: 'center' }}>
                             <div style={{ 
                                 display: 'inline-block', 
-                                padding: '4px 16px', 
+                                padding: '6px 16px', 
                                 borderRadius: '9999px', 
-                                backgroundColor: 'rgba(255, 255, 255, 0.05)', 
-                                border: '1px solid rgba(255, 255, 255, 0.05)', 
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)', 
                                 fontSize: '10px', 
-                                color: '#6b7280', 
-                                fontFamily: 'monospace', 
-                                letterSpacing: '0.1em' 
+                                color: '#9ca3af', 
+                                fontFamily: 'system-ui, sans-serif', 
+                                letterSpacing: '0.12em',
+                                textTransform: 'uppercase'
                             }}>
                                 PLAYED ON SCOREJUDGE
                             </div>

@@ -28,7 +28,8 @@ describe('ScoreShareOverlay', () => {
     
     // Should appear in header and on button
     expect(screen.getAllByText('Share Results')).toHaveLength(2);
-    expect(screen.getByText('Test Game')).toBeInTheDocument();
+    // Game name is uppercased in the share card
+    expect(screen.getByText('TEST GAME')).toBeInTheDocument();
     expect(screen.getByText('Player One')).toBeInTheDocument();
     expect(screen.getByText('Player Two')).toBeInTheDocument();
     expect(screen.getByText('Player Three')).toBeInTheDocument();
