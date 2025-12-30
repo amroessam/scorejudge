@@ -359,26 +359,26 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="min-h-screen p-6 max-w-4xl mx-auto space-y-8">
-            <header className="flex items-center justify-between">
+        <div className="min-h-screen p-4 md:p-6 max-w-4xl mx-auto space-y-6 md:space-y-8 safe-pb overflow-y-auto">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
                 <div>
-                    <div className="flex items-center gap-3 mb-1">
-                        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 font-[family-name:var(--font-russo)] tracking-wider drop-shadow-sm">
+                    <div className="flex items-center gap-2 md:gap-3 mb-1">
+                        <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 font-[family-name:var(--font-russo)] tracking-wider drop-shadow-sm">
                             SCOREJUDGE
                         </h1>
-                        <div className="flex gap-1 ml-1">
-                            <Spade size={18} className="text-indigo-400 fill-indigo-400/20" />
-                            <Heart size={18} className="text-rose-400 fill-rose-400/20" />
-                            <Club size={18} className="text-emerald-400 fill-emerald-400/20" />
-                            <Diamond size={18} className="text-amber-400 fill-amber-400/20" />
+                        <div className="flex gap-1 ml-1 shrink-0">
+                            <Spade size={14} className="md:w-[18px] md:h-[18px] text-indigo-400 fill-indigo-400/20" />
+                            <Heart size={14} className="md:w-[18px] md:h-[18px] text-rose-400 fill-rose-400/20" />
+                            <Club size={14} className="md:w-[18px] md:h-[18px] text-emerald-400 fill-emerald-400/20" />
+                            <Diamond size={14} className="md:w-[18px] md:h-[18px] text-amber-400 fill-amber-400/20" />
                         </div>
                     </div>
-                    <p className="text-muted-foreground font-medium">Live scorekeeper for Judgement</p>
+                    <p className="text-muted-foreground font-medium text-sm md:text-base">Live scorekeeper for Judgement</p>
                 </div>
                 
                 <Link 
                     href="/create" 
-                    className="relative group px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-indigo-500/25"
+                    className="relative group w-full md:w-auto px-6 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] md:hover:scale-105 active:scale-95 shadow-lg hover:shadow-indigo-500/25 flex justify-center items-center"
                 >
                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
