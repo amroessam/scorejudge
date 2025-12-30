@@ -96,90 +96,119 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                 {/* Share Preview Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto p-6 bg-[var(--background)] flex items-center justify-center">
                     
-                    {/* The Card to be Captured */}
+                    {/* The Card to be Captured - Using inline styles for html2canvas compatibility */}
                     <div 
                         ref={shareRef}
-                        className="w-full bg-[#1a1a1a] rounded-2xl p-6 relative overflow-hidden shadow-2xl border border-white/5"
                         style={{
+                            width: '100%',
+                            backgroundColor: '#1a1a1a',
+                            borderRadius: '16px',
+                            padding: '24px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                            border: '1px solid rgba(255, 255, 255, 0.05)',
                             backgroundImage: 'radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(0, 0, 0, 0) 50%)'
                         }}
                     >
                         {/* Decorative Background Elements */}
-                        <div className="absolute top-0 right-0 p-4 opacity-5">
-                            <Spade size={120} />
+                        <div style={{ position: 'absolute', top: 0, right: 0, padding: '16px', opacity: 0.05 }}>
+                            <Spade size={120} color="#ffffff" />
                         </div>
-                        <div className="absolute bottom-0 left-0 p-4 opacity-5">
-                            <Heart size={120} />
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, padding: '16px', opacity: 0.05 }}>
+                            <Heart size={120} color="#ffffff" />
                         </div>
 
                         {/* Logo / Header */}
-                        <div className="text-center mb-8 relative z-10">
-                            <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 font-[family-name:var(--font-russo)] tracking-wider drop-shadow-sm mb-2">
+                        <div style={{ textAlign: 'center', marginBottom: '32px', position: 'relative', zIndex: 10 }}>
+                            <h2 style={{ 
+                                fontSize: '1.875rem', 
+                                fontWeight: 'bold', 
+                                background: 'linear-gradient(to right, #60a5fa, #a855f7, #ec4899)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                                letterSpacing: '0.05em',
+                                marginBottom: '8px',
+                                fontFamily: 'var(--font-russo), sans-serif'
+                            }}>
                                 SCOREJUDGE
                             </h2>
-                            <p className="text-sm text-gray-400 font-medium uppercase tracking-widest">
+                            <p style={{ fontSize: '0.875rem', color: '#9ca3af', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                                 {gameName}
                             </p>
-                            <div className="flex justify-center gap-2 mt-3 opacity-50">
-                                <Spade size={12} className="text-indigo-400" />
-                                <Heart size={12} className="text-rose-400" />
-                                <Club size={12} className="text-emerald-400" />
-                                <Diamond size={12} className="text-amber-400" />
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '12px', opacity: 0.5 }}>
+                                <Spade size={12} color="#818cf8" />
+                                <Heart size={12} color="#fb7185" />
+                                <Club size={12} color="#34d399" />
+                                <Diamond size={12} color="#fbbf24" />
                             </div>
                         </div>
 
                         {/* Score List */}
-                        <div className="space-y-3 relative z-10">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', zIndex: 10 }}>
                             {sortedPlayers.map((player, index) => {
                                 const isWinner = index === 0;
                                 const isLast = index === sortedPlayers.length - 1;
                                 const medal = getPositionIndicator(index, sortedPlayers.length);
 
+                                const cardStyle: React.CSSProperties = {
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '12px',
+                                    borderRadius: '12px',
+                                    border: isWinner 
+                                        ? '1px solid rgba(234, 179, 8, 0.3)' 
+                                        : isLast 
+                                            ? '1px solid rgba(255, 255, 255, 0.1)' 
+                                            : '1px solid rgba(255, 255, 255, 0.05)',
+                                    background: isWinner 
+                                        ? 'linear-gradient(to right, rgba(234, 179, 8, 0.2), rgba(245, 158, 11, 0.05))' 
+                                        : isLast 
+                                            ? 'linear-gradient(to right, rgba(239, 68, 68, 0.1), rgba(234, 179, 8, 0.1), rgba(59, 130, 246, 0.1))' 
+                                            : 'rgba(255, 255, 255, 0.05)',
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                };
+
                                 return (
                                     <div 
                                         key={player.email}
-                                        className={`
-                                            flex items-center justify-between p-3 rounded-xl border relative overflow-hidden
-                                            ${isWinner 
-                                                ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/5 border-yellow-500/30' 
-                                                : isLast 
-                                                    ? 'bg-gradient-to-r from-red-500/10 via-yellow-500/10 to-blue-500/10 border-white/10' 
-                                                    : 'bg-white/5 border-white/5'
-                                            }
-                                        `}
+                                        style={cardStyle}
                                     >
-                                        <div className="flex items-center gap-3">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             {/* Rank / Medal */}
-                                            <div className="w-8 h-8 flex items-center justify-center text-xl">
-                                                {medal || <span className="text-gray-500 text-sm font-bold">#{index + 1}</span>}
+                                            <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                                                {medal || <span style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: 'bold' }}>#{index + 1}</span>}
                                             </div>
                                             
                                             {/* Avatar */}
-                                            <div className="relative">
+                                            <div style={{ position: 'relative' }}>
                                                 {player.image ? (
-                                                    <img src={player.image} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-white/10" />
+                                                    <img src={player.image} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.1)' }} />
                                                 ) : (
-                                                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-gray-400">
+                                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#9ca3af' }}>
                                                         {player.name.charAt(0)}
                                                     </div>
                                                 )}
                                                 {isWinner && (
-                                                    <div className="absolute -top-2 -right-2 transform rotate-12">
-                                                        <span className="text-xl">👑</span>
+                                                    <div style={{ position: 'absolute', top: '-8px', right: '-8px', transform: 'rotate(12deg)' }}>
+                                                        <span style={{ fontSize: '1.25rem' }}>👑</span>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Name */}
                                             <div>
-                                                <div className={`font-[family-name:var(--font-russo)] ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+                                                <div style={{ fontFamily: 'var(--font-russo), sans-serif', color: isWinner ? '#facc15' : '#ffffff' }}>
                                                     {player.name}
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Score */}
-                                        <div className={`text-2xl font-bold font-mono ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'monospace', color: isWinner ? '#facc15' : '#ffffff' }}>
                                             {player.score}
                                         </div>
                                     </div>
@@ -188,8 +217,18 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                         </div>
 
                         {/* Footer */}
-                        <div className="mt-8 text-center">
-                            <div className="inline-block px-4 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] text-gray-500 font-mono tracking-widest">
+                        <div style={{ marginTop: '32px', textAlign: 'center' }}>
+                            <div style={{ 
+                                display: 'inline-block', 
+                                padding: '4px 16px', 
+                                borderRadius: '9999px', 
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)', 
+                                border: '1px solid rgba(255, 255, 255, 0.05)', 
+                                fontSize: '10px', 
+                                color: '#6b7280', 
+                                fontFamily: 'monospace', 
+                                letterSpacing: '0.1em' 
+                            }}>
                                 PLAYED ON SCOREJUDGE
                             </div>
                         </div>
