@@ -28,7 +28,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
 
     const handleShare = async () => {
         if (!shareRef.current) return;
-        
+
         setCapturing(true);
         try {
             await new Promise(resolve => setTimeout(resolve, 300));
@@ -41,7 +41,8 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                 useCORS: true,
                 logging: false,
                 allowTaint: true
-            });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any);
 
             const imageUrl = canvas.toDataURL('image/png');
 
@@ -49,7 +50,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                 try {
                     const blob = await (await fetch(imageUrl)).blob();
                     const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
-                    
+
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {
                         await navigator.share({
                             title: `ScoreJudge Results: ${gameName}`,
@@ -68,7 +69,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
             link.download = `scorejudge-${gameName.replace(/\s+/g, '-').toLowerCase()}.png`;
             link.href = imageUrl;
             link.click();
-            
+
         } catch (e) {
             console.error('Error generating image:', e);
             alert('Failed to generate image. Please try again.');
@@ -80,11 +81,11 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="w-full max-w-md bg-[var(--card)] rounded-3xl overflow-hidden shadow-2xl border border-[var(--border)] flex flex-col max-h-[90vh]">
-                
+
                 {/* Header Actions */}
                 <div className="p-4 flex justify-between items-center border-b border-[var(--border)] bg-[var(--background)]/50 backdrop-blur-md sticky top-0 z-10">
                     <h3 className="font-[family-name:var(--font-russo)] text-xl">Share Results</h3>
-                    <button 
+                    <button
                         onClick={onClose}
                         className="p-2 rounded-full hover:bg-[var(--secondary)] transition-colors"
                     >
@@ -94,13 +95,13 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
 
                 {/* Share Preview Content */}
                 <div className="flex-1 overflow-y-auto p-4 bg-[var(--background)] flex items-center justify-center">
-                    
+
                     {/* 
                         The Card to be Captured 
                         IMPORTANT: html2canvas doesn't support oklab() from Tailwind CSS 4
                         All colors MUST use explicit hex/rgb values, NOT CSS variables or Tailwind classes
                     */}
-                    <div 
+                    <div
                         ref={shareRef}
                         style={{
                             width: '320px',
@@ -112,8 +113,8 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                         }}
                     >
                         {/* Header */}
-                        <div style={{ 
-                            textAlign: 'center', 
+                        <div style={{
+                            textAlign: 'center',
                             marginBottom: '24px',
                         }}>
                             {/* SCOREJUDGE Title with 3D effect */}
@@ -127,7 +128,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                             }}>
                                 SCOREJUDGE
                             </div>
-                            
+
                             {/* Game Name */}
                             <div style={{
                                 fontSize: '13px',
@@ -139,12 +140,12 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                             }}>
                                 {gameName.toUpperCase()}
                             </div>
-                            
+
                             {/* Card Suits - using explicit hex colors */}
-                            <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'center', 
-                                gap: '10px', 
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'center',
+                                gap: '10px',
                                 fontSize: '16px',
                             }}>
                                 <span style={{ color: '#818cf8' }}>♠</span>
@@ -168,10 +169,10 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                     padding: '12px 14px',
                                     borderRadius: '14px',
                                     backgroundColor: isWinner ? '#332800' : isLast ? '#1f1528' : '#171717',
-                                    border: isWinner 
-                                        ? '2px solid #ca8a04' 
-                                        : isLast 
-                                            ? '1px solid #7c3aed' 
+                                    border: isWinner
+                                        ? '2px solid #ca8a04'
+                                        : isLast
+                                            ? '1px solid #7c3aed'
                                             : '1px solid #262626',
                                     boxShadow: isWinner ? '0 4px 12px rgba(202, 138, 4, 0.25)' : 'none',
                                 };
@@ -179,54 +180,54 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                 return (
                                     <div key={player.email} style={cardStyles}>
                                         {/* Medal/Position - fixed width */}
-                                        <div style={{ 
-                                            width: '32px', 
-                                            height: '32px', 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
+                                        <div style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            display: 'flex',
+                                            alignItems: 'center',
                                             justifyContent: 'center',
                                             fontSize: '18px',
                                             flexShrink: 0,
                                         }}>
                                             {medal || (
-                                                <span style={{ 
-                                                    color: '#71717a', 
-                                                    fontSize: '11px', 
-                                                    fontWeight: '700' 
+                                                <span style={{
+                                                    color: '#71717a',
+                                                    fontSize: '11px',
+                                                    fontWeight: '700'
                                                 }}>
                                                     #{index + 1}
                                                 </span>
                                             )}
                                         </div>
-                                        
+
                                         {/* Avatar - fixed size */}
-                                        <div style={{ 
+                                        <div style={{
                                             position: 'relative',
                                             flexShrink: 0,
                                             marginRight: '10px',
                                         }}>
                                             {player.image ? (
-                                                <img 
-                                                    src={player.image} 
-                                                    alt="" 
-                                                    style={{ 
-                                                        width: '40px', 
-                                                        height: '40px', 
-                                                        borderRadius: '50%', 
+                                                <img
+                                                    src={player.image}
+                                                    alt=""
+                                                    style={{
+                                                        width: '40px',
+                                                        height: '40px',
+                                                        borderRadius: '50%',
                                                         objectFit: 'cover',
                                                         border: isWinner ? '2px solid #eab308' : '2px solid #3f3f46',
-                                                    }} 
+                                                    }}
                                                 />
                                             ) : (
-                                                <div style={{ 
-                                                    width: '40px', 
-                                                    height: '40px', 
-                                                    borderRadius: '50%', 
-                                                    backgroundColor: '#27272a', 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'center', 
-                                                    fontWeight: '700', 
+                                                <div style={{
+                                                    width: '40px',
+                                                    height: '40px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#27272a',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontWeight: '700',
                                                     color: '#d4d4d8',
                                                     fontSize: '16px',
                                                     border: isWinner ? '2px solid #eab308' : '2px solid #3f3f46',
@@ -236,9 +237,9 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                             )}
                                             {/* Crown for winner */}
                                             {isWinner && (
-                                                <div style={{ 
-                                                    position: 'absolute', 
-                                                    top: '-10px', 
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    top: '-10px',
                                                     left: '50%',
                                                     transform: 'translateX(-50%)',
                                                     fontSize: '14px',
@@ -249,7 +250,7 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                         </div>
 
                                         {/* Player Name - flex grow, no truncation */}
-                                        <div style={{ 
+                                        <div style={{
                                             flex: 1,
                                             minWidth: 0,
                                             fontWeight: '600',
@@ -264,12 +265,12 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                                         </div>
 
                                         {/* Score - fixed width, right aligned */}
-                                        <div style={{ 
-                                            fontSize: '24px', 
+                                        <div style={{
+                                            fontSize: '24px',
                                             fontWeight: '700',
                                             color: isWinner ? '#fde047' : '#ffffff',
-                                            textShadow: isWinner 
-                                                ? '0 2px 0 #a16207, 0 3px 6px rgba(0,0,0,0.4)' 
+                                            textShadow: isWinner
+                                                ? '0 2px 0 #a16207, 0 3px 6px rgba(0,0,0,0.4)'
                                                 : '0 1px 3px rgba(0,0,0,0.3)',
                                             marginLeft: '12px',
                                             flexShrink: 0,
@@ -284,19 +285,19 @@ export function ScoreShareOverlay({ isOpen, onClose, players, gameName }: ScoreS
                         </div>
 
                         {/* Footer - explicit hex colors */}
-                        <div style={{ 
-                            marginTop: '20px', 
+                        <div style={{
+                            marginTop: '20px',
                             textAlign: 'center',
                         }}>
-                            <div style={{ 
-                                display: 'inline-block', 
-                                padding: '6px 14px', 
-                                borderRadius: '20px', 
+                            <div style={{
+                                display: 'inline-block',
+                                padding: '6px 14px',
+                                borderRadius: '20px',
                                 backgroundColor: '#171717',
                                 border: '1px solid #262626',
-                                fontSize: '9px', 
+                                fontSize: '9px',
                                 fontWeight: '600',
-                                color: '#71717a', 
+                                color: '#71717a',
                                 letterSpacing: '1.2px',
                                 textTransform: 'uppercase',
                             }}>

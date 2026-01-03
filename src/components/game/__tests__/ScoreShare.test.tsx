@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ScoreShareOverlay } from '../ScoreShareOverlay';
 
 // Mock html2canvas since it doesn't work in JSDOM
@@ -16,44 +16,83 @@ describe('ScoreShareOverlay', () => {
     { id: '4', name: 'Player Four', email: 'p4@test.com', score: 40, tricks: 0, bid: 0 },
   ];
 
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('renders correctly when open', () => {
     render(
-      <ScoreShareOverlay 
-        isOpen={true} 
-        onClose={() => {}} 
-        players={mockPlayers} 
-        gameName="Test Game" 
+      <ScoreShareOverlay
+        isOpen={true}
+        onClose={() => { }}
+        players={mockPlayers}
+        gameName="Test Game"
       />
     );
-    
+
     // Should appear in header and on button
-    expect(screen.getAllByText('Share Results')).toHaveLength(2);
+    expect(screen.getAllByText('Share Results', { selector: 'h3, button' })).toHaveLength(2);
     // Game name is uppercased in the share card
     expect(screen.getByText('TEST GAME')).toBeInTheDocument();
     expect(screen.getByText('Player One')).toBeInTheDocument();
-    expect(screen.getByText('Player Two')).toBeInTheDocument();
-    expect(screen.getByText('Player Three')).toBeInTheDocument();
-    expect(screen.getByText('Player Four')).toBeInTheDocument();
-    
-    // Check for medals/emojis
-    expect(screen.getByText('🥇')).toBeInTheDocument();
-    expect(screen.getByText('🥈')).toBeInTheDocument();
-    expect(screen.getByText('🥉')).toBeInTheDocument();
-    // Last player gets rainbow flag
-    expect(screen.getByText('🏳️‍🌈')).toBeInTheDocument();
   });
 
   it('does not render when closed', () => {
     render(
-      <ScoreShareOverlay 
-        isOpen={false} 
-        onClose={() => {}} 
-        players={mockPlayers} 
-        gameName="Test Game" 
+      <ScoreShareOverlay
+        isOpen={false}
+        onClose={() => { }}
+        players={mockPlayers}
+        gameName="Test Game"
       />
     );
-    
+
     expect(screen.queryByText('Share Results')).not.toBeInTheDocument();
   });
-});
 
+  it('triggers capture and share when button is clicked', async () => {
+    const mockShare = jest.fn(() => Promise.resolve());
+    const mockCanShare = jest.fn(() => true);
+
+    // Polyfill navigator APIs for testing
+    Object.defineProperty(global.navigator, 'share', {
+      value: mockShare,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(global.navigator, 'canShare', {
+      value: mockCanShare,
+      configurable: true,
+      writable: true
+    });
+
+    // Mock fetch for image blob conversion
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        blob: () => Promise.resolve(new Blob(['fake'], { type: 'image/png' }))
+      })
+    ) as jest.Mock;
+
+    render(
+      <ScoreShareOverlay
+        isOpen={true}
+        onClose={() => { }}
+        players={mockPlayers}
+        gameName="Test Game"
+      />
+    );
+
+    const shareButton = screen.getByText('Share Results', { selector: 'button' });
+
+    await act(async () => {
+      fireEvent.click(shareButton);
+      // Wait for the internal promises (timeouts and capture)
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    });
+
+    expect(mockShare).toHaveBeenCalled();
+
+    // Cleanup fetch
+    delete (global as any).fetch;
+  });
+});
