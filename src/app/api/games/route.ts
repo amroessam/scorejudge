@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { setGame, type GameState } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
-import { createGame, getUserByEmail, upsertUser } from "@/lib/db";
+import { createGame, getUserByEmail, upsertUser, addPlayer } from "@/lib/db";
 import { supabaseAdmin } from "@/lib/supabase";
 
 // Using Route Handler for data fetching to keep credentials server-side
@@ -99,6 +99,9 @@ export async function POST(req: NextRequest) {
         }
 
         const gameId = dbGame.id;
+
+        // 3. Add host as the first player in the database
+        await addPlayer(gameId, user.id, 0);
 
         // 3. Initialize game state in memory for immediate access
         const now = Date.now();

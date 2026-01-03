@@ -79,6 +79,18 @@ describe('db.ts (Supabase Data Access Layer)', () => {
         });
     });
 
+    describe('addPlayer', () => {
+        it('should add a player to a game', async () => {
+            (supabaseAdmin.from as jest.Mock).mockReturnValueOnce({
+                insert: jest.fn(() => Promise.resolve({ error: null }))
+            });
+
+            const success = await addPlayer('game-1', 'user-1', 0);
+            expect(supabaseAdmin.from).toHaveBeenCalledWith('game_players');
+            expect(success).toBe(true);
+        });
+    });
+
     describe('getGame', () => {
         it('should fetch a full game state', async () => {
             // Complex mock for nested queries
