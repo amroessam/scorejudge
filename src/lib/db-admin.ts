@@ -24,9 +24,18 @@ export async function runMigrations() {
     `;
 
         // 2. Read migration files
-        const migrationsDir = path.join(process.cwd(), 'supabase', 'migrations');
+        let migrationsDir = path.join(process.cwd(), 'supabase', 'migrations');
+
+        // Fix for Docker/standalone environments where the migrations directory might be one level up
         if (!fs.existsSync(migrationsDir)) {
-            console.log('No migrations directory found.');
+            const fallback = path.join(process.cwd(), '..', 'supabase', 'migrations');
+            if (fs.existsSync(fallback)) {
+                migrationsDir = fallback;
+            }
+        }
+
+        if (!fs.existsSync(migrationsDir)) {
+            console.warn('⚠️  Migrations directory not found. Skipping automatic migrations.');
             return;
         }
 
