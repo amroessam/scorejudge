@@ -24,15 +24,7 @@ export async function runMigrations() {
     `;
 
         // 2. Read migration files
-        let migrationsDir = path.join(process.cwd(), 'supabase', 'migrations');
-
-        // Fix for Docker/standalone environments where the migrations directory might be one level up
-        if (!fs.existsSync(migrationsDir)) {
-            const fallback = path.join(process.cwd(), '..', 'supabase', 'migrations');
-            if (fs.existsSync(fallback)) {
-                migrationsDir = fallback;
-            }
-        }
+        const migrationsDir = path.join(process.cwd(), 'supabase', 'migrations');
 
         if (!fs.existsSync(migrationsDir)) {
             console.warn('⚠️  Migrations directory not found. Skipping automatic migrations.');

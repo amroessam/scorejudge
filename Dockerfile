@@ -45,6 +45,7 @@ COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/postcss.config.mjs ./
 COPY --from=builder /app/types ./types
+COPY --from=builder /app/supabase ./supabase
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app
