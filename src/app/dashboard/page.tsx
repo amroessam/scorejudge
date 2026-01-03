@@ -83,7 +83,12 @@ export default function Dashboard() {
                 .then((res) => res.json())
                 .then((data) => {
                     if (Array.isArray(data)) {
-                        setGames(data);
+                        // Sort games by creation time, newest first
+                        const sortedGames = [...data].sort((a: GameFile, b: GameFile) =>
+                            new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime()
+                        );
+                        setGames(sortedGames);
+
                         // Fetch game states to check if they've started
                         data.forEach((game: GameFile) => {
                             fetch(`/api/games/${game.id}`)
@@ -130,7 +135,7 @@ export default function Dashboard() {
 
         const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${typeof window !== 'undefined' ? window.location.host : 'localhost:3000'}/ws?channel=discovery`;
-        
+
         let socket: WebSocket | null = null;
         let reconnectTimeout: NodeJS.Timeout | null = null;
         let reconnectAttempts = 0;
@@ -149,19 +154,19 @@ export default function Dashboard() {
                 socket.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
-                        
+
                         // Check for error messages from server
                         if (data.type === 'ERROR') {
                             console.error('[Discovery] WebSocket server error:', data.message);
                             return;
                         }
-                        
+
                         if (data.type === 'DISCOVERY_UPDATE') {
                             console.log('[Discovery] Received update:', data);
-                            
+
                             // Handle deletion updates immediately (remove from local state)
                             if (data.updateType === 'GAME_DELETED' && data.game) {
-                                setDiscoverableGames((prev) => 
+                                setDiscoverableGames((prev) =>
                                     prev.filter((g) => g.id !== data.game.id)
                                 );
                             } else {
@@ -204,7 +209,7 @@ export default function Dashboard() {
                     const wasClean = event.wasClean;
                     const code = event.code;
                     const reason = event.reason || 'No reason provided';
-                    
+
                     // Log closure details
                     if (wasClean) {
                         console.log('[Discovery] WebSocket closed cleanly');
@@ -220,10 +225,10 @@ export default function Dashboard() {
                     // - Policy violation (1008) - typically means authentication failure
                     // - Max reconnection attempts reached
                     const isPolicyViolation = code === 1008;
-                    const shouldReconnect = !wasClean && 
-                                          !isPolicyViolation &&
-                                          reconnectAttempts < maxReconnectAttempts;
-                    
+                    const shouldReconnect = !wasClean &&
+                        !isPolicyViolation &&
+                        reconnectAttempts < maxReconnectAttempts;
+
                     if (isPolicyViolation) {
                         console.log('[Discovery] Policy violation detected, will not reconnect. Please refresh the page.');
                     } else if (shouldReconnect) {
@@ -256,7 +261,7 @@ export default function Dashboard() {
     const handleDelete = async (gameId: string, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         if (!confirm("Are you sure you want to delete this game? This will permanently delete the game from Google Drive and cannot be undone.")) {
             return;
         }
@@ -293,7 +298,7 @@ export default function Dashboard() {
     const hasGameStarted = (gameId: string): boolean => {
         const state = gameStates[gameId];
         if (!state) return false; // Assume started if we don't know
-        return state.currentRoundIndex > 0 || 
+        return state.currentRoundIndex > 0 ||
             (state.rounds !== undefined && state.rounds !== null && state.rounds.some((r: any) => r.state === 'COMPLETED' || r.state === 'PLAYING'));
     };
 
@@ -310,42 +315,42 @@ export default function Dashboard() {
 
         const numPlayers = state.players?.length || 0;
         const finalRound = getFinalRoundNumber(numPlayers);
-        
+
         // Determine if game is completed
         // A game is completed if the last round is marked as COMPLETED and its index >= finalRound
         const completedRounds = state.rounds?.filter(r => r.state === 'COMPLETED') || [];
-        const lastCompletedRound = completedRounds.length > 0 
+        const lastCompletedRound = completedRounds.length > 0
             ? Math.max(...completedRounds.map(r => r.index))
             : 0;
-        
+
         const isCompleted = lastCompletedRound >= finalRound && numPlayers > 0;
-        
+
         if (isCompleted) {
-            return { 
-                label: 'Completed', 
-                color: 'text-green-400', 
+            return {
+                label: 'Completed',
+                color: 'text-green-400',
                 bg: 'bg-green-500/10',
                 border: 'border-green-500/20',
-                icon: CheckCircle 
+                icon: CheckCircle
             };
         }
 
         if (state.currentRoundIndex > 0 || (state.rounds && state.rounds.some(r => r.state === 'COMPLETED' || r.state === 'PLAYING'))) {
-            return { 
-                label: `Round ${state.currentRoundIndex} of ${finalRound}`, 
-                color: 'text-indigo-400', 
+            return {
+                label: `Round ${state.currentRoundIndex} of ${finalRound}`,
+                color: 'text-indigo-400',
                 bg: 'bg-indigo-500/10',
                 border: 'border-indigo-500/20',
-                icon: PlayCircle 
+                icon: PlayCircle
             };
         }
 
-        return { 
-            label: 'Not Started', 
-            color: 'text-yellow-400', 
+        return {
+            label: 'Not Started',
+            color: 'text-yellow-400',
             bg: 'bg-yellow-500/10',
             border: 'border-yellow-500/20',
-            icon: AlertCircle 
+            icon: AlertCircle
         };
     };
 
@@ -359,7 +364,7 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="min-h-screen p-4 md:p-6 max-w-4xl mx-auto space-y-6 md:space-y-8 safe-pb overflow-y-auto">
+        <div className="min-h-screen p-4 md:p-6 max-w-4xl mx-auto space-y-6 md:space-y-8 safe-pb">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
                 <div>
                     <div className="flex items-center gap-2 md:gap-3 mb-1">
@@ -375,16 +380,16 @@ export default function Dashboard() {
                     </div>
                     <p className="text-muted-foreground font-medium text-sm md:text-base">Live scorekeeper for Judgement</p>
                 </div>
-                
-                <Link 
-                    href="/create" 
+
+                <Link
+                    href="/create"
                     className="relative group w-full md:w-auto px-6 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] md:hover:scale-105 active:scale-95 shadow-lg hover:shadow-indigo-500/25 flex justify-center items-center"
                 >
                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
                     <div className="absolute inset-0 border border-white/20 rounded-xl" />
                     <span className="relative flex items-center gap-2 font-bold text-white tracking-wide">
-                        <Plus size={20} strokeWidth={3} /> 
+                        <Plus size={20} strokeWidth={3} />
                         <span className="font-[family-name:var(--font-russo)]">NEW GAME</span>
                     </span>
                 </Link>
@@ -461,7 +466,7 @@ export default function Dashboard() {
                                 const isDeleting = deleting === g.id;
                                 const status = getGameStatus(g.id);
                                 const StatusIcon = status.icon;
-                                
+
                                 return (
                                     <div key={g.id} className="glass p-5 rounded-xl flex items-center justify-between group hover:scale-[1.01] transition-all">
                                         <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-between">
