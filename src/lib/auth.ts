@@ -61,6 +61,7 @@ export const authOptions: NextAuthOptions = {
         async signIn({ user, account, profile }) {
             if (user.email) {
                 await upsertUser({
+                    id: user.id, // Pass the user ID from NextAuth
                     email: user.email,
                     name: user.name || undefined,
                     image: user.image || undefined,

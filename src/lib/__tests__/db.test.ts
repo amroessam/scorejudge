@@ -43,6 +43,24 @@ describe('db.ts (Supabase Data Access Layer)', () => {
             expect(supabaseAdmin.from).toHaveBeenCalledWith('users');
             expect(user?.id).toBe('user-1');
         });
+
+        it('should upsert a user with a custom string ID (for debug users)', async () => {
+            const customId = 'anon_123456';
+            const userData = { id: customId, email: 'anon@debug.local', name: 'Anon User' };
+
+            // Update mock for this specific call
+            (supabaseAdmin.from as jest.Mock).mockReturnValueOnce({
+                upsert: jest.fn(() => ({
+                    select: jest.fn(() => ({
+                        single: jest.fn(() => Promise.resolve({ data: { id: customId }, error: null }))
+                    }))
+                }))
+            });
+
+            const user = await upsertUser(userData);
+
+            expect(user?.id).toBe(customId);
+        });
     });
 
     describe('getUserByEmail', () => {

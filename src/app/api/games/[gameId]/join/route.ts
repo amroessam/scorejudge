@@ -40,6 +40,7 @@ export async function POST(
     let user = await getUserByEmail(token.email as string);
     if (!user) {
         user = await upsertUser({
+            id: token.id as string, // Pass the user ID from token
             email: token.email as string,
             name: token.name as string,
             image: token.picture as string,

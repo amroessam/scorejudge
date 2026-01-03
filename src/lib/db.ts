@@ -17,10 +17,20 @@ export async function getUserByEmail(email: string) {
     return data;
 }
 
-export async function upsertUser(user: { email: string; name?: string; image?: string; google_sub?: string }) {
+export async function upsertUser(user: {
+    email: string;
+    name?: string;
+    image?: string;
+    google_sub?: string;
+    id?: string; // Allow passing custom ID for debug users
+}) {
+    // Use provided ID, or fall back to google_sub, or email as last resort
+    const userId = user.id || user.google_sub || user.email;
+
     const { data, error } = await supabaseAdmin
         .from('users')
         .upsert({
+            id: userId,
             email: user.email,
             name: user.name,
             image: user.image,

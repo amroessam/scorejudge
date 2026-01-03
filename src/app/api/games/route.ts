@@ -10,9 +10,11 @@ export async function GET(req: NextRequest) {
     const token = await getAuthToken(req);
 
     if (!token) {
-        console.error('GET: No token found. Cookies:', req.cookies.getAll().map(c => c.name));
+        console.error('[GET /api/games] No token found');
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    console.log('[GET /api/games] Fetching games for user:', { id: token.id, email: token.email });
 
     try {
         // Fetch games where user is a player from Supabase
@@ -22,20 +24,27 @@ export async function GET(req: NextRequest) {
                 id,
                 name,
                 created_at,
+                current_round_index,
                 game_players!inner(user_id)
             `)
             .eq('game_players.user_id', token.id);
 
-        if (error) throw error;
+        if (error) {
+            console.error('[GET /api/games] Supabase error:', error);
+            throw error;
+        }
+
+        console.log(`[GET /api/games] Found ${games?.length || 0} games for user ${token.email}`);
 
         // Map to format expected by UI
         return NextResponse.json(games.map(g => ({
             id: g.id,
             name: g.name,
-            createdTime: g.created_at
+            createdTime: g.created_at,
+            currentRoundIndex: g.current_round_index
         })));
     } catch (error) {
-        console.error('GET Games Error:', error);
+        console.error('[GET /api/games] Error:', error);
         return NextResponse.json({ error: "Failed to fetch games" }, { status: 500 });
     }
 }
@@ -71,6 +80,7 @@ export async function POST(req: NextRequest) {
             // This should have been handled by signIn callback, but safety first
             console.error("User not found in Supabase during game creation, attempting recovery sync");
             user = await upsertUser({
+                id: token.id as string, // Pass the user ID from token
                 email: token.email as string,
                 name: token.name as string,
                 image: token.picture as string,
