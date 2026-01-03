@@ -200,24 +200,59 @@ export function ScoreEntryOverlay({
         setError(null);
     };
 
+    /**
+     * Deep Validation: Checks if there exists ANY distribution of tricks across missed players
+     * such that the total sum matches cardsPerPlayer AND no missed player takes exactly their bid.
+     */
+    const isDistributionPossible = (
+        remainingTricks: number,
+        missedPlayers: { email: string; bid: number }[]
+    ): boolean => {
+        if (missedPlayers.length === 0) {
+            return remainingTricks === 0;
+        }
+
+        const [currentPlayer, ...rest] = missedPlayers;
+
+        // A missed player can take anything from 0 to remainingTricks, 
+        // as long as it's NOT their bid.
+        for (let t = 0; t <= remainingTricks; t++) {
+            if (t === currentPlayer.bid) continue; // Must be ≠ bid to be "Missed"
+
+            if (isDistributionPossible(remainingTricks - t, rest)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
     const validate = () => {
         const cardsPerPlayer = activeRound.cards;
         const currentInputs: Record<string, number> = {};
 
-        // Parse inputs - default to 0 if not set
+        // Parse inputs
         for (const p of players) {
             const val = inputs[p.email];
-            if (val === undefined || val === '') {
-                // Default to 0
-                currentInputs[p.email] = 0;
+
+            if (type === 'BIDS') {
+                if (val === undefined || val === '') {
+                    // Default to 0 for bids as per user preference
+                    currentInputs[p.email] = 0;
+                } else {
+                    const num = parseInt(val.toString());
+                    if (isNaN(num) || num < 0) return `Invalid value for ${p.name}`;
+                    if (num > cardsPerPlayer) return `${p.name} cannot have more than ${cardsPerPlayer}`;
+                    currentInputs[p.email] = num;
+                }
             } else {
+                // For TRICKS, every player MUST have a value (bid or -1)
+                if (val === undefined || val === '') {
+                    return `Missing score for ${p.name}`;
+                }
                 const num = parseInt(val.toString());
-                if (isNaN(num) || (num < 0 && num !== -1)) {
-                    return `Invalid value for ${p.name}`;
-                }
-                if (num > cardsPerPlayer && num !== -1) {
-                    return `${p.name} cannot have more than ${cardsPerPlayer}`;
-                }
+                if (isNaN(num) || (num < 0 && num !== -1)) return `Invalid value for ${p.name}`;
+                if (num > cardsPerPlayer && num !== -1) return `${p.name} cannot have more than ${cardsPerPlayer}`;
                 currentInputs[p.email] = num;
             }
         }
@@ -280,9 +315,18 @@ export function ScoreEntryOverlay({
                 return `Invalid: The sum of tricks for players who made their bids (${sumMadeBids}) exceeds the total tricks available (${cardsPerPlayer}).`;
             }
 
-            if (!hasMissedBids && sumMadeBids !== cardsPerPlayer) {
-                const unaccountedTricks = cardsPerPlayer - sumMadeBids;
-                return `Invalid: All players are marked as Made, but only ${sumMadeBids} out of ${cardsPerPlayer} tricks are accounted for. There are ${unaccountedTricks} unaccounted trick(s).`;
+            // Deep validation for missed players
+            const missedPlayersList = players
+                .filter((p: Player) => currentInputs[p.email] === -1)
+                .map((p: Player) => ({ email: p.email, bid: activeRound.bids[p.email] ?? 0 }));
+
+            const remainingTricks = cardsPerPlayer - sumMadeBids;
+
+            if (!isDistributionPossible(remainingTricks, missedPlayersList)) {
+                if (missedPlayersList.length === 0) {
+                    return `Invalid: All tricks (${cardsPerPlayer}) must be accounted for. Current sum is ${sumMadeBids}.`;
+                }
+                return `Invalid distribution: The remaining ${remainingTricks} trick(s) cannot be split among missed players without someone hitting their bid.`;
             }
         }
 
@@ -298,7 +342,7 @@ export function ScoreEntryOverlay({
 
         setLoading(true);
         try {
-            // Process inputs: Convert to numbers, default to 0
+            // Process inputs: Convert to numbers, default to 0 for bids only
             const processedInputs: Record<string, number> = {};
             for (const p of players) {
                 const val = inputs[p.email];

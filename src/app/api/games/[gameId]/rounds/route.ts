@@ -33,6 +33,33 @@ function getDealerIndex(roundIndex: number, numPlayers: number): number {
     return (roundIndex - 1) % numPlayers;
 }
 
+/**
+ * Deep Validation: Checks if there exists ANY distribution of tricks across missed players
+ * such that the total sum matches requiredTricks AND no missed player takes exactly their bid.
+ */
+function isDistributionPossible(
+    requiredTricks: number,
+    missedPlayers: { email: string; bid: number }[]
+): boolean {
+    if (missedPlayers.length === 0) {
+        return requiredTricks === 0;
+    }
+
+    const [currentPlayer, ...rest] = missedPlayers;
+
+    // A missed player can take anything from 0 to requiredTricks, 
+    // as long as it's NOT their bid.
+    for (let t = 0; t <= requiredTricks; t++) {
+        if (t === currentPlayer.bid) continue; // Must be ≠ bid
+
+        if (isDistributionPossible(requiredTricks - t, rest)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ gameId: string }> }
@@ -123,7 +150,9 @@ export async function POST(
 
             for (const p of game.players) {
                 const trick = inputs[p.email];
-                if (trick === undefined) return NextResponse.json({ error: `Missing tricks for ${p.name}` }, { status: 400 });
+                if (trick === undefined || trick === null || trick === '') {
+                    return NextResponse.json({ error: `Missing tricks for ${p.name}` }, { status: 400 });
+                }
                 const numTrick = Number(trick);
                 validatedTricks[p.email] = numTrick;
 
@@ -135,6 +164,32 @@ export async function POST(
                 } else {
                     points[p.email] = 0;
                 }
+            }
+
+            // Deep validation for missed players
+            const missedPlayers = game.players
+                .filter((p: Player) => validatedTricks[p.email] === -1)
+                .map((p: Player) => ({ email: p.email, bid: round.bids[p.email] ?? 0 }));
+
+            const sumMadeBids = Object.entries(validatedTricks).reduce((sum, [email, tricks]) => {
+                const bid = round.bids[email];
+                if (bid !== undefined && tricks !== -1 && tricks === bid) {
+                    return sum + tricks;
+                }
+                return sum;
+            }, 0);
+
+            const remainingTricks = cardsPerPlayer - sumMadeBids;
+
+            if (!isDistributionPossible(remainingTricks, missedPlayers)) {
+                if (missedPlayers.length === 0) {
+                    return NextResponse.json({
+                        error: `Invalid: All tricks (${cardsPerPlayer}) must be accounted for. Current sum is ${sumMadeBids}.`
+                    }, { status: 400 });
+                }
+                return NextResponse.json({
+                    error: `Invalid distribution: The remaining ${remainingTricks} trick(s) cannot be split among missed players without someone hitting their bid.`
+                }, { status: 400 });
             }
 
             await saveRoundTricks(gameId, round.index, validatedTricks, points, game.players);

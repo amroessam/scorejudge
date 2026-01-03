@@ -166,14 +166,13 @@ describe('ScoreEntryOverlay - Game End', () => {
             expect(screen.getByText(/Enter Scores/i)).toBeInTheDocument();
         });
 
-        // Mark players: p1 and p2 missed (X), p3 made (checkmark)
+        // Mark players: p1, p2, and p3 all made their bids (valid distribution for 1 trick)
         const checkButtons = screen.getAllByTitle('Made bid');
-        const missButtons = screen.getAllByTitle('Missed bid');
 
-        // Click miss for p1 and p2, check for p3
-        fireEvent.click(missButtons[0]); // p1
-        fireEvent.click(missButtons[1]); // p2
-        fireEvent.click(checkButtons[2]); // p3
+        // p1: bid 0, p2: bid 0, p3: bid 1. Total = 1 trick.
+        fireEvent.click(checkButtons[0]); // p1 made 0
+        fireEvent.click(checkButtons[1]); // p2 made 0
+        fireEvent.click(checkButtons[2]); // p3 made 1
 
         // Submit tricks
         const submitButton = screen.getByText(/Confirm Scores/i);

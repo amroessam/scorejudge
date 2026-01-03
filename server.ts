@@ -4,6 +4,7 @@ import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { getGame, type GameState } from './src/lib/store';
+import { getGame as getDbGame } from './src/lib/db';
 import { getToken } from 'next-auth/jwt';
 import { IncomingMessage } from 'http';
 import { runMigrations } from './src/lib/db-admin';
@@ -97,8 +98,8 @@ app.prepare().then(async () => {
         }
     }
 
-    function findGame(gameId: string): any {
-        return getGame(gameId);
+    async function findGame(gameId: string): Promise<GameState | null> {
+        return getGame(gameId) || await getDbGame(gameId);
     }
 
     // Helper function to validate WebSocket authentication
@@ -122,7 +123,7 @@ app.prepare().then(async () => {
                 return { valid: true, email: token.email as string };
             }
 
-            const game = findGame(gameId);
+            const game = await findGame(gameId);
 
             if (!game) {
                 console.error(`[WebSocket auth] Game ${gameId} not found`);
@@ -199,7 +200,7 @@ app.prepare().then(async () => {
         clients.set(ws, { gameId, email: authResult.email! });
 
         // Send current state
-        const state = findGame(gameId);
+        const state = await findGame(gameId);
 
         if (state) {
             ws.send(JSON.stringify({ type: 'GAME_UPDATE', state }));

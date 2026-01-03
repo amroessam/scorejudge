@@ -412,6 +412,91 @@ describe('/api/games/[gameId]/rounds', () => {
       expect(data.success).toBe(true);
       expect(data.game.rounds[0].state).toBe('COMPLETED');
     });
+
+    it('should reject trick submission if a player score is missing', async () => {
+      const gameState = createGameState(3);
+      gameState.rounds = [
+        {
+          index: 1,
+          cards: 5,
+          trump: 'S',
+          state: 'PLAYING',
+          bids: {
+            'player1@test.com': 2,
+            'player2@test.com': 1,
+            'player3@test.com': 2,
+          },
+          tricks: {},
+        }
+      ];
+      gameState.currentRoundIndex = 1;
+      setGame('game1', gameState);
+
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TRICKS',
+          inputs: {
+            'player1@test.com': 2,
+            'player2@test.com': 1,
+            // player3 is missing
+          },
+        }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('Missing tricks for Player 3');
+    });
+
+    it('should reject impossible trick distribution in 1-card round', async () => {
+      const gameState = createGameState(3);
+      gameState.rounds = [
+        {
+          index: 1,
+          cards: 1, // EXACTLY 1 card total
+          trump: 'S',
+          state: 'PLAYING',
+          bids: {
+            'player1@test.com': 0,
+            'player2@test.com': 1,
+            'player3@test.com': 1,
+          },
+          tricks: {},
+        }
+      ];
+      gameState.currentRoundIndex = 1;
+      setGame('game1', gameState);
+
+      // p1 made 0 (correct)
+      // p2 missed 1 (taken 0 or >1, but only 1 available)
+      // p3 missed 1 (taken 0 or >1, but only 1 available)
+      // SUM of tricks must be 1. 
+      // Combo (0, 0, 1) -> p3 hit bid 1. 
+      // Combo (0, 1, 0) -> p2 hit bid 1.
+      // So impossible.
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TRICKS',
+          inputs: {
+            'player1@test.com': 0, // Made
+            'player2@test.com': -1, // Missed
+            'player3@test.com': -1, // Missed
+          },
+        }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('Invalid distribution');
+    });
   });
 });
 
