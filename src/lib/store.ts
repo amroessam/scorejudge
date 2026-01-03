@@ -1,6 +1,5 @@
 // Basic In-Memory Store
-// In a real production app (if not serverless), this works for a single instance.
-// If scaling, we'd use Redis. But user said "No DB", so in-memory single-instance is the constraint.
+// Provides fast access and real-time state sharing across API routes and WebSockets.
 
 export interface Player {
     id: string;
@@ -9,7 +8,7 @@ export interface Player {
     tricks: number;
     bid: number;
     score: number;
-    image?: string; // Profile picture URL
+    image?: string;
 }
 
 export interface Round {
@@ -22,27 +21,21 @@ export interface Round {
 }
 
 export interface GameState {
-    id: string; // Sheet ID
+    id: string; // Supabase UUID
     name: string;
     players: Player[];
     rounds: Round[];
     currentRoundIndex: number;
     ownerEmail: string;
-    operatorEmail?: string; // Defaults to ownerEmail if not set
-    firstDealerEmail?: string; // Optional: specific starting dealer
-
-    // Timestamps
-    createdAt: number; // When the game was created
-    lastUpdated: number; // When the game was last updated
-    
-    // Skip Google Sheets sync for this game (for temp/offline games)
-    skipSheetSync?: boolean;
+    operatorEmail?: string;
+    firstDealerEmail?: string;
+    createdAt: number;
+    lastUpdated: number;
 }
 
+// Global store to persist across HMR during development
 const globalForStore = globalThis as unknown as { gameStore: Map<string, GameState> };
 
-// Always use the same store instance across the application
-// This ensures API routes and WebSocket server share the same memory
 if (!globalForStore.gameStore) {
     globalForStore.gameStore = new Map<string, GameState>();
 }
@@ -55,7 +48,6 @@ export function getGame(id: string) {
 
 export function setGame(id: string, state: GameState) {
     games.set(id, state);
-    // Set createdAt if not already set (for new games)
     if (!state.createdAt) {
         state.createdAt = Date.now();
     }
@@ -68,29 +60,11 @@ export function updateGame(id: string, partial: Partial<GameState>) {
     if (!current) return null;
     const updated = { ...current, ...partial, lastUpdated: Date.now() };
     games.set(id, updated);
-    return updated; // Return updated state
+    return updated;
 }
 
 export function removeGame(id: string) {
     games.delete(id);
-}
-
-// Map temporary IDs to real sheet IDs
-const globalForIdMap = globalThis as unknown as { tempIdMap: Map<string, string> };
-
-// Always use the same tempIdMap instance across the application
-if (!globalForIdMap.tempIdMap) {
-    globalForIdMap.tempIdMap = new Map<string, string>();
-}
-
-const tempIdMap = globalForIdMap.tempIdMap;
-
-export function mapTempIdToSheetId(tempId: string, sheetId: string) {
-    tempIdMap.set(tempId, sheetId);
-}
-
-export function getSheetIdFromTempId(tempId: string): string | undefined {
-    return tempIdMap.get(tempId);
 }
 
 export function getAllGames(): GameState[] {

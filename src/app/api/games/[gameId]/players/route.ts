@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGame, setGame, getSheetIdFromTempId } from "@/lib/store";
+import { getGame, setGame } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
+import { getGame as getDbGame, updateUser } from "@/lib/db";
 
 export async function PATCH(
     req: NextRequest,
@@ -13,9 +14,9 @@ export async function PATCH(
     }
 
     const { gameId } = await params;
-    
+
     const token = await getAuthToken(req);
-    
+
     if (!token) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -27,25 +28,13 @@ export async function PATCH(
     } catch (e) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    
+
     const { name, image } = body;
     if (!name && !image) {
         return NextResponse.json({ error: "Name or Image is required" }, { status: 400 });
     }
 
-    // Resolve game ID
-    let actualGameId = gameId;
-    if (gameId.startsWith('temp_')) {
-        const realSheetId = getSheetIdFromTempId(gameId);
-        if (realSheetId) {
-            actualGameId = realSheetId;
-        }
-    }
-    
-    let game = getGame(actualGameId);
-    if (!game) {
-        game = getGame(gameId); // Try original ID too
-    }
+    let game = getGame(gameId) || await getDbGame(gameId);
 
     if (!game) {
         return NextResponse.json({ error: "Game not found" }, { status: 404 });
@@ -53,38 +42,32 @@ export async function PATCH(
 
     // Check if game has started - name changes are only allowed before the game starts
     if (name && game.currentRoundIndex > 0) {
-        return NextResponse.json({ 
-            error: "Name cannot be changed after the game has started" 
+        return NextResponse.json({
+            error: "Name cannot be changed after the game has started"
         }, { status: 400 });
     }
 
-    // Update player
+    // Update player in database (Users table)
+    // We update the user record so it reflects across all games
+    await updateUser(token.id as string, {
+        display_name: name || undefined,
+        image: image || undefined
+    });
+
+    // Update player in memory
     const playerIndex = game.players.findIndex(p => p.email === token.email);
-    if (playerIndex === -1) {
-        return NextResponse.json({ error: "Player not found in game" }, { status: 404 });
+    if (playerIndex !== -1) {
+        if (name) game.players[playerIndex].name = name;
+        if (image) game.players[playerIndex].image = image;
     }
 
-    // Update fields
-    if (name) game.players[playerIndex].name = name;
-    if (image) game.players[playerIndex].image = image;
-    
     // Save to store
-    setGame(actualGameId, game);
-    if (actualGameId !== gameId) {
-        setGame(gameId, game);
-    }
+    setGame(gameId, game);
 
     // Broadcast update
     if ((global as any).broadcastGameUpdate) {
         (global as any).broadcastGameUpdate(gameId, game);
-        if (actualGameId !== gameId) {
-            (global as any).broadcastGameUpdate(actualGameId, game);
-        }
     }
-
-    // TODO: Update in Google Sheet if we want persistence of name changes
-    // For now, in-memory update is sufficient for live game play
-    // But ideally we'd update the Players sheet too.
 
     return NextResponse.json({ success: true, game });
 }

@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { DEBUG_MODE } from "./config";
+import { upsertUser } from "./db";
 
 const providers: any[] = [
     GoogleProvider({
@@ -9,7 +10,7 @@ const providers: any[] = [
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         authorization: {
             params: {
-                scope: "openid email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets",
+                scope: "openid email profile",
                 prompt: "consent",
                 access_type: "offline",
                 response_type: "code",
@@ -44,7 +45,7 @@ export const authOptions: NextAuthOptions = {
     },
     cookies: {
         sessionToken: {
-            name: process.env.NODE_ENV === 'production' 
+            name: process.env.NODE_ENV === 'production'
                 ? '__Secure-next-auth.session-token'
                 : 'next-auth.session-token',
             options: {
@@ -57,6 +58,17 @@ export const authOptions: NextAuthOptions = {
     },
     useSecureCookies: process.env.NODE_ENV === 'production',
     callbacks: {
+        async signIn({ user, account, profile }) {
+            if (user.email) {
+                await upsertUser({
+                    email: user.email,
+                    name: user.name || undefined,
+                    image: user.image || undefined,
+                    google_sub: profile?.sub || undefined,
+                });
+            }
+            return true;
+        },
         async jwt({ token, account, user }) {
             // Initial sign in
             if (account && user) {
@@ -88,10 +100,10 @@ export const authOptions: NextAuthOptions = {
         async redirect({ url, baseUrl }) {
             // Always use relative URLs so they respect the current origin (ngrok or localhost)
             // This ensures redirects work correctly regardless of NEXTAUTH_URL setting
-            
+
             // If url is already relative, return as-is
             if (url.startsWith("/")) return url;
-            
+
             // If url is absolute, extract just the path to make it relative
             try {
                 const urlObj = new URL(url);
