@@ -1,11 +1,11 @@
-import { supabaseAdmin } from '../supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 import {
     upsertUser,
     createGame,
     getGame,
     addPlayer,
     getUserByEmail
-} from '../db';
+} from '@/lib/db';
 
 // Mock Supabase client
 jest.mock('../supabase', () => ({

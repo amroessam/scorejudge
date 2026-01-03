@@ -25,6 +25,7 @@ describe('ScoreEntryOverlay - Bid Input Handling', () => {
     ],
     currentRoundIndex: 1,
     ownerEmail: 'p1@test.com',
+    createdAt: Date.now(),
     lastUpdated: Date.now(),
   };
 
@@ -174,11 +175,11 @@ describe('ScoreEntryOverlay - Bid Input Handling', () => {
     });
 
     const inputs = screen.getAllByRole('spinbutton');
-    
+
     // User enters bids
     fireEvent.change(inputs[0], { target: { value: '2' } });
     fireEvent.change(inputs[1], { target: { value: '1' } });
-    
+
     expect(inputs[0]).toHaveValue(2);
     expect(inputs[1]).toHaveValue(1);
 
@@ -223,7 +224,7 @@ describe('ScoreEntryOverlay - Bid Input Handling', () => {
     });
 
     const inputs = screen.getAllByRole('spinbutton');
-    
+
     // User enters a bid
     fireEvent.change(inputs[0], { target: { value: '3' } });
     expect(inputs[0]).toHaveValue(3);

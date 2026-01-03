@@ -16,24 +16,10 @@ jest.mock('@/lib/csrf', () => ({
   validateCSRF: jest.fn(),
 }));
 
-// Mock Google APIs
-jest.mock('@/lib/google', () => ({
-  getGoogleFromToken: jest.fn(),
-}));
-
-jest.mock('googleapis', () => ({
-  google: {
-    drive: jest.fn(() => ({
-      files: {
-        delete: jest.fn().mockResolvedValue({}),
-      },
-    })),
-  },
-}));
-
-// Mock game-logic to prevent actual Google Sheets calls
-jest.mock('@/lib/game-logic', () => ({
-  fetchGameFromSheet: jest.fn(),
+jest.mock('@/lib/db', () => ({
+  getGame: jest.fn(),
+  updateGame: jest.fn(),
+  deleteGame: jest.fn(),
 }));
 
 describe('/api/games/[gameId] DELETE', () => {
@@ -48,7 +34,7 @@ describe('/api/games/[gameId] DELETE', () => {
     }
     jest.clearAllMocks();
     (validateCSRF as jest.Mock).mockReturnValue(true);
-    
+
     // Mock broadcastDiscoveryUpdate
     (global as any).broadcastDiscoveryUpdate = jest.fn();
   });

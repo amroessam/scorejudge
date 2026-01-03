@@ -28,6 +28,7 @@ describe('ScoreEntryOverlay - Player Order', () => {
     currentRoundIndex: 1,
     ownerEmail: 'p1@test.com',
     firstDealerEmail: 'dealer@test.com',
+    createdAt: Date.now(),
     lastUpdated: Date.now(),
   };
 
@@ -56,16 +57,16 @@ describe('ScoreEntryOverlay - Player Order', () => {
 
     // Get all player names in the order they appear
     const playerNames = screen.getAllByText(/Player \d|Dealer/);
-    
+
     // In bidding order, dealer goes last, so order should be based on dealer position
     // First dealer is at index 3, so order should be: p1, p2, p3, dealer (wrapping around)
     // Actually, orderedPlayers puts left of dealer first, then dealer last
     // Dealer is at index 3, so order should be: p1, p2, p3, dealer
-    
+
     // Verify the order is NOT sorted by score (which would be: dealer 15, p1 10, p3 8, p2 5)
     // Instead it should maintain the original order relative to dealer
     const namesText = playerNames.map(el => el.textContent).join(' ');
-    
+
     // The order should be based on dealer position, not score
     // Since dealer is last in the original array, and orderedPlayers puts left of dealer first,
     // the order should be: p1, p2, p3, dealer (not sorted by score)
@@ -73,7 +74,7 @@ describe('ScoreEntryOverlay - Player Order', () => {
     expect(namesText).toContain('Player 2');
     expect(namesText).toContain('Player 3');
     expect(namesText).toContain('Dealer');
-    
+
     // Verify dealer is last (as per bidding order rules)
     const lastPlayer = playerNames[playerNames.length - 1];
     expect(lastPlayer).toHaveTextContent('Dealer');

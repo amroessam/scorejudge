@@ -18,6 +18,7 @@ describe('RoundControls', () => {
     currentRoundIndex: 0,
     ownerEmail: 'p1@test.com',
     operatorEmail: 'p1@test.com',
+    createdAt: Date.now(),
     lastUpdated: Date.now(),
   };
 
@@ -103,7 +104,7 @@ describe('RoundControls', () => {
     expect(screen.getByText('Round 1 • Bids')).toBeInTheDocument();
     expect(screen.getByText('Cards: 5')).toBeInTheDocument();
     expect(screen.getByText(/Trump:.*Spades/i)).toBeInTheDocument();
-    
+
     // Should have input fields for each player
     const inputs = screen.getAllByPlaceholderText('Bid');
     expect(inputs).toHaveLength(3);
@@ -139,12 +140,12 @@ describe('RoundControls', () => {
     );
 
     expect(screen.getByText('Round 1 • Tricks')).toBeInTheDocument();
-    
+
     // Each player should have check and X buttons
     const buttons = screen.getAllByRole('button');
     const checkButtons = buttons.filter(btn => btn.title === 'Made bid (tricks = bid)');
     const xButtons = buttons.filter(btn => btn.title === 'Missed bid');
-    
+
     expect(checkButtons.length).toBe(3);
     expect(xButtons.length).toBe(3);
   });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setGame, getGame } from "@/lib/store";
+import { setGame, getGame, type GameState, type Player } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { getGame as getDbGame, addPlayer, getUserByEmail, upsertUser } from "@/lib/db";
@@ -21,13 +21,26 @@ export async function POST(
     }
 
     // 1. Get Game State
-    let game = getGame(gameId) || await getDbGame(gameId);
+    let game: GameState | null | undefined = getGame(gameId);
+
+    // If not in memory, check if it's a temp ID (not yet synced to DB)
+    if (!game && gameId.startsWith('temp_')) {
+        return NextResponse.json({
+            error: "Game is still being created. Please wait a moment and try again."
+        }, { status: 404 });
+    }
+
+    // If still not found, try to fetch from Supabase
+    if (!game) {
+        game = await getDbGame(gameId);
+    }
+
     if (!game) {
         return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
 
     // 2. Check if already joined
-    if (game.players.some(p => p.email === token.email)) {
+    if (game.players.some((p: Player) => p.email === token.email)) {
         return NextResponse.json({ message: "Already joined", game });
     }
 

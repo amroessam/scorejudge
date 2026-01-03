@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setGame, getGame, GameState, Round } from "@/lib/store";
+import { supabaseAdmin } from "@/lib/supabase";
+import { setGame, getGame, type GameState, type Round, type Player } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { DECK_SIZE } from "@/lib/config";
@@ -111,6 +112,15 @@ export async function POST(
             const points: Record<string, number> = {};
             const cardsPerPlayer = round.cards;
 
+            // 1. Validation: for zero-bidders, at most cardsPerPlayer can miss
+            const zeroBidders = game.players.filter((p: Player) => round.bids[p.email] === 0);
+            const missedZeroBidders = zeroBidders.filter((p: Player) => inputs[p.email] === -1);
+            if (missedZeroBidders.length > round.cards) {
+                return NextResponse.json({
+                    error: `Invalid input: at most ${round.cards} player(s) can miss when they bid 0 in this round.`
+                }, { status: 400 });
+            }
+
             for (const p of game.players) {
                 const trick = inputs[p.email];
                 if (trick === undefined) return NextResponse.json({ error: `Missing tricks for ${p.name}` }, { status: 400 });
@@ -135,6 +145,64 @@ export async function POST(
             if (game.currentRoundIndex < finalRound) {
                 game.currentRoundIndex += 1;
                 await updateDbGame(gameId, { currentRoundIndex: game.currentRoundIndex });
+            }
+        } else if (action === 'UNDO') {
+            const targetIdx = targetRoundIndex || game.currentRoundIndex;
+            const round = game.rounds.find(r => r.index === targetIdx);
+
+            if (!round) {
+                return NextResponse.json({ error: "Round not found" }, { status: 404 });
+            }
+
+            console.log(`[Rounds API] Undoing round ${targetIdx}. Current state: ${round.state}`);
+            const initialState = round.state;
+
+            if (initialState === 'PLAYING') {
+                // Revert from PLAYING back to BIDDING
+                round.state = 'BIDDING';
+                round.bids = {};
+                round.tricks = {};
+
+                // Update DB: Set round state to BIDDING
+                await supabaseAdmin
+                    .from('rounds')
+                    .update({ state: 'BIDDING' })
+                    .eq('game_id', gameId)
+                    .eq('round_index', targetIdx);
+            } else if (initialState === 'COMPLETED') {
+                // Revert from COMPLETED back to PLAYING
+                // 1. Revert scores for all players in this round
+                for (const p of game.players) {
+                    const bid = round.bids[p.email];
+                    const tricks = round.tricks[p.email];
+                    if (bid !== undefined && tricks !== undefined && tricks !== -1 && bid === tricks) {
+                        const pointsToRemove = bid + round.cards;
+                        p.score = Math.max(0, p.score - pointsToRemove);
+                    }
+
+                    // Update game_players score in DB
+                    await supabaseAdmin
+                        .from('game_players')
+                        .update({ score: p.score })
+                        .eq('game_id', gameId)
+                        .eq('user_id', p.id);
+                }
+
+                // 2. Set round state back to PLAYING
+                round.state = 'PLAYING';
+                round.tricks = {};
+
+                await supabaseAdmin
+                    .from('rounds')
+                    .update({ state: 'PLAYING' })
+                    .eq('game_id', gameId)
+                    .eq('round_index', targetIdx);
+
+                // 3. Move currentRoundIndex back to this round if it was advanced
+                if (game.currentRoundIndex > targetIdx) {
+                    game.currentRoundIndex = targetIdx;
+                    await updateDbGame(gameId, { currentRoundIndex: targetIdx });
+                }
             }
         }
 

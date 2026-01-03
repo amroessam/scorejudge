@@ -11,10 +11,6 @@ jest.mock('@/lib/auth-utils', () => ({
   getAuthToken: jest.fn(),
 }));
 
-jest.mock('@/lib/google', () => ({
-  getGoogleFromToken: jest.fn(),
-}));
-
 describe('/api/games/discover', () => {
   beforeEach(() => {
     // Clear the store before each test
@@ -67,6 +63,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -77,6 +74,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 1,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -116,6 +114,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -126,6 +125,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -164,6 +164,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -209,6 +210,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -250,6 +252,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -260,6 +263,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -293,6 +297,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -304,6 +309,7 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -429,8 +435,9 @@ describe('/api/games/discover', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: now,
         lastUpdated: now,
-      } as GameState; // Cast to bypass TypeScript check
+      } as GameState;
 
       setGame('game1', game);
 

@@ -16,6 +16,12 @@ jest.mock('@/lib/csrf', () => ({
   validateCSRF: jest.fn(),
 }));
 
+jest.mock('@/lib/db', () => ({
+  getGame: jest.fn(),
+  updateUser: jest.fn().mockResolvedValue({ id: 'user1', email: 'player@test.com' }),
+  getUserByEmail: jest.fn().mockResolvedValue({ id: 'user1', email: 'player@test.com' }),
+}));
+
 describe('/api/games/[gameId]/players', () => {
   beforeEach(() => {
     // Clear the store before each test
@@ -47,6 +53,7 @@ describe('/api/games/[gameId]/players', () => {
       rounds: [],
       currentRoundIndex,
       ownerEmail: 'owner@test.com',
+      createdAt: Date.now(),
       lastUpdated: Date.now(),
     });
 
@@ -72,7 +79,7 @@ describe('/api/games/[gameId]/players', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.game.players[0].name).toBe('New Name');
-      
+
       // Verify the game was updated in store
       const updatedGame = getGame('game1');
       expect(updatedGame?.players[0].name).toBe('New Name');
@@ -99,7 +106,7 @@ describe('/api/games/[gameId]/players', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toContain('cannot be changed');
-      
+
       // Verify the game was NOT updated in store
       const unchangedGame = getGame('game1');
       expect(unchangedGame?.players[0].name).toBe('Original Name');

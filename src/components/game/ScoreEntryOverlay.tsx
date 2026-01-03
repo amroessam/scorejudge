@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check as CheckIcon, AlertCircle, Loader2, Lightbulb } from "lucide-react";
+import { X, Check as CheckIcon, AlertCircle, Loader2, Lightbulb, ChevronLeft } from "lucide-react";
 import { Player } from "@/lib/store";
 import { DECK_SIZE } from "@/lib/config";
 
@@ -20,31 +20,31 @@ function getFinalRoundNumber(numPlayers: number): number {
     return maxCards * 2 - 1;
 }
 
-export function ScoreEntryOverlay({ 
-    isOpen, 
-    onClose, 
-    gameId, 
-    gameState, 
-    onGameUpdate 
+export function ScoreEntryOverlay({
+    isOpen,
+    onClose,
+    gameId,
+    gameState,
+    onGameUpdate
 }: ScoreEntryOverlayProps) {
     const { players, currentRoundIndex, rounds, firstDealerEmail } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
-    
+
     // Lock the type when overlay opens to prevent it from changing during exit animation
     const lockedTypeRef = useRef<'BIDS' | 'TRICKS' | null>(null);
-    
+
     // Check if game ended
     const finalRoundNumber = getFinalRoundNumber(players.length);
     const completedRounds = rounds.filter((r: any) => r.state === 'COMPLETED');
-    const lastCompletedRound = completedRounds.length > 0 
+    const lastCompletedRound = completedRounds.length > 0
         ? Math.max(...completedRounds.map((r: any) => r.index))
         : 0;
     const isGameEnded = lastCompletedRound >= finalRoundNumber;
-    
+
     // Determine Entry Type - lock it when overlay opens
     const isBidding = !activeRound || activeRound.state === 'BIDDING';
     const currentType = isBidding ? 'BIDS' : 'TRICKS';
-    
+
     // Lock type when overlay opens, keep it locked during exit animation
     useEffect(() => {
         if (isOpen) {
@@ -53,7 +53,7 @@ export function ScoreEntryOverlay({
         }
         // Don't clear the lock immediately when closing - let it persist during exit animation
     }, [isOpen, currentType]);
-    
+
     // Clear lock after overlay is fully closed (when isOpen becomes false)
     useEffect(() => {
         if (!isOpen && lockedTypeRef.current !== null) {
@@ -64,10 +64,10 @@ export function ScoreEntryOverlay({
             return () => clearTimeout(timer);
         }
     }, [isOpen]);
-    
+
     // Use locked type if available, otherwise use current type
     const type = lockedTypeRef.current ?? currentType;
-    
+
     // Close overlay if game ended
     useEffect(() => {
         if (isGameEnded && isOpen) {
@@ -82,7 +82,7 @@ export function ScoreEntryOverlay({
         if (idx !== -1) firstDealerIndex = idx;
     }
     const dealerIndex = (firstDealerIndex + (currentRoundIndex - 1)) % players.length;
-    
+
     // Order: Left of dealer first, dealer last
     const orderedPlayers = [
         ...players.slice(dealerIndex + 1),
@@ -93,10 +93,10 @@ export function ScoreEntryOverlay({
     const [inputs, setInputs] = useState<Record<string, number | string>>({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    
+
     // Refs for focus management (only for bids)
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-    
+
     // Track if inputs have been initialized for the current open session
     // This prevents re-initialization when gameState changes via WebSocket
     const hasInitializedRef = useRef(false);
@@ -107,17 +107,17 @@ export function ScoreEntryOverlay({
         // Detect when overlay opens (transition from closed to open)
         const justOpened = isOpen && !lastOpenStateRef.current;
         lastOpenStateRef.current = isOpen;
-        
+
         // Reset initialization flag when overlay closes
         if (!isOpen) {
             hasInitializedRef.current = false;
             return;
         }
-        
+
         // Only initialize if we just opened and haven't initialized yet
         if (justOpened && !hasInitializedRef.current && activeRound) {
             hasInitializedRef.current = true;
-            
+
             const initial: Record<string, number | string> = {};
             players.forEach((p: Player) => {
                 if (type === 'BIDS') {
@@ -138,7 +138,7 @@ export function ScoreEntryOverlay({
             });
             setInputs(initial);
             setError(null);
-            
+
             // Auto focus first input after animation (only for bids)
             if (type === 'BIDS') {
                 setTimeout(() => {
@@ -150,23 +150,23 @@ export function ScoreEntryOverlay({
 
     const handleInputChange = (email: string, value: string) => {
         const maxCards = activeRound?.cards || 0;
-        
+
         // Allow empty input - will be treated as 0 on submit
         if (value === '') {
             setInputs(prev => ({ ...prev, [email]: '' }));
             setError(null);
             return;
         }
-        
+
         // Remove leading zeros (e.g., "02" -> "2", "007" -> "7")
         // But preserve "0" as is
         let normalizedValue = value;
         if (normalizedValue.length > 1 && normalizedValue.startsWith('0')) {
             normalizedValue = normalizedValue.replace(/^0+/, '') || '0';
         }
-        
+
         const numValue = parseInt(normalizedValue, 10);
-        
+
         if (!isNaN(numValue) && numValue >= 0) {
             // Enforce max limit: can't bid more than cards dealt
             const clampedValue = Math.min(numValue, maxCards);
@@ -203,7 +203,7 @@ export function ScoreEntryOverlay({
     const validate = () => {
         const cardsPerPlayer = activeRound.cards;
         const currentInputs: Record<string, number> = {};
-        
+
         // Parse inputs - default to 0 if not set
         for (const p of players) {
             const val = inputs[p.email];
@@ -247,7 +247,7 @@ export function ScoreEntryOverlay({
             // Validation logic from RoundControls
             let missedCount = 0;
             let sumMadeBids = 0;
-            
+
             players.forEach((p: Player) => {
                 const bid = activeRound.bids?.[p.email];
                 const tricksValue = currentInputs[p.email];
@@ -322,11 +322,11 @@ export function ScoreEntryOverlay({
                 // Check if game has ended - if so, update state immediately to show end screen
                 const finalRoundNumber = getFinalRoundNumber(players.length);
                 const completedRounds = data.game?.rounds?.filter((r: any) => r.state === 'COMPLETED') || [];
-                const lastCompletedRound = completedRounds.length > 0 
+                const lastCompletedRound = completedRounds.length > 0
                     ? Math.max(...completedRounds.map((r: any) => r.index))
                     : 0;
                 const isGameEnded = lastCompletedRound >= finalRoundNumber;
-                
+
                 if (isGameEnded && data.game) {
                     // Game ended - update state immediately to show end screen and confetti
                     onGameUpdate(data.game);
@@ -348,6 +348,35 @@ export function ScoreEntryOverlay({
             const errorMessage = e?.message || "Network error - please check your connection";
             setError(errorMessage);
             console.error("[ScoreEntryOverlay] Submit error:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUndo = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/games/${gameId}/rounds`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'UNDO' })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.error || "Failed to go back to bids");
+                return;
+            }
+
+            if (data.game) {
+                onGameUpdate(data.game);
+                // The useEffect will handle resetting inputs
+            }
+        } catch (e) {
+            console.error(e);
+            setError("Error going back to bids");
         } finally {
             setLoading(false);
         }
@@ -379,7 +408,7 @@ export function ScoreEntryOverlay({
             const numBid = bid === undefined || bid === '' ? 0 : parseInt(bid.toString());
             return sum + (isNaN(numBid) ? 0 : numBid);
         }, 0) : 0;
-    
+
     const invalidDealerBid = cardsPerPlayer - sumOfOtherBids;
     const validDealerBids = type === 'BIDS' && dealerEmail
         ? Array.from({ length: cardsPerPlayer + 1 }, (_, i) => i).filter(bid => bid !== invalidDealerBid)
@@ -409,9 +438,21 @@ export function ScoreEntryOverlay({
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-[var(--border)] shrink-0">
                             <div>
-                                <h3 className="text-xl font-bold">
-                                    {type === 'BIDS' ? 'Enter Bids' : 'Enter Tricks'}
-                                </h3>
+                                <div className="flex items-center gap-2">
+                                    {type === 'TRICKS' && (
+                                        <button
+                                            onClick={handleUndo}
+                                            disabled={loading}
+                                            className="p-2 -ml-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-90 transition-transform disabled:opacity-50"
+                                            title="Back to Bids"
+                                        >
+                                            <ChevronLeft size={24} />
+                                        </button>
+                                    )}
+                                    <h2 className="text-xl font-bold">
+                                        {type === 'BIDS' ? 'Enter Bids' : 'Enter Scores'}
+                                    </h2>
+                                </div>
                                 <p className="text-sm text-[var(--muted-foreground)]">
                                     Round {currentRoundIndex} • {activeRound?.cards} Cards
                                 </p>
@@ -446,7 +487,7 @@ export function ScoreEntryOverlay({
                                 const bid = activeRound?.bids?.[p.email];
                                 const tricksValue = inputs[p.email];
                                 const madeBid = bid !== undefined && tricksValue !== undefined && tricksValue !== -1 && bid === tricksValue;
-                                
+
                                 return (
                                     <div key={p.email} className="flex items-center justify-between gap-4">
                                         <div className="flex-1">
@@ -458,21 +499,21 @@ export function ScoreEntryOverlay({
                                                 {type === 'TRICKS' && `Bid: ${bid ?? '-'}`}
                                             </div>
                                         </div>
-                                        
+
                                         {type === 'BIDS' ? (
                                             <div className="flex items-center gap-2">
-                                            <input
-                                                ref={el => { inputRefs.current[index] = el }}
-                                                type="number"
-                                                inputMode="numeric"
-                                                pattern="[0-9]*"
-                                                min="0"
-                                                max={activeRound?.cards || 0}
-                                                value={inputs[p.email] ?? ''}
-                                                onChange={(e) => handleInputChange(p.email, e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, index)}
-                                                className="w-20 h-14 bg-[var(--background)] border border-[var(--border)] rounded-xl text-center text-2xl font-bold focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all touch-manipulation"
-                                            />
+                                                <input
+                                                    ref={el => { inputRefs.current[index] = el }}
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    min="0"
+                                                    max={activeRound?.cards || 0}
+                                                    value={inputs[p.email] ?? ''}
+                                                    onChange={(e) => handleInputChange(p.email, e.target.value)}
+                                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                                    className="w-20 h-14 bg-[var(--background)] border border-[var(--border)] rounded-xl text-center text-2xl font-bold focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all touch-manipulation"
+                                                />
                                                 {isDealer && (
                                                     <div className="flex items-center gap-1 mt-1">
                                                         <span className="text-xs font-bold text-red-500">
@@ -488,8 +529,8 @@ export function ScoreEntryOverlay({
                                                     onClick={() => bid !== undefined && handleTrickMade(p.email, bid)}
                                                     className={`
                                                         p-3 rounded-xl transition-all active:scale-95 touch-manipulation
-                                                        ${madeBid 
-                                                            ? 'bg-green-500/20 text-green-400 border-2 border-green-500/50' 
+                                                        ${madeBid
+                                                            ? 'bg-green-500/20 text-green-400 border-2 border-green-500/50'
                                                             : 'bg-[var(--secondary)] text-[var(--muted-foreground)] hover:bg-green-500/10 hover:text-green-400 border border-[var(--border)]'
                                                         }
                                                     `}

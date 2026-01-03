@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGame, setGame } from "@/lib/store";
+import { getGame, setGame, type Player } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { getGame as getDbGame, updateUser, getUserByEmail } from "@/lib/db";
@@ -58,11 +58,13 @@ export async function PATCH(
     }
 
     // Update player in memory
-    const playerIndex = game.players.findIndex(p => p.email === token.email);
-    if (playerIndex !== -1) {
-        if (name) game.players[playerIndex].name = name;
-        if (image) game.players[playerIndex].image = image;
+    const playerIndex = game.players.findIndex((p: Player) => p.email === token.email);
+    if (playerIndex === -1) {
+        return NextResponse.json({ error: "Player not found in game" }, { status: 404 });
     }
+
+    if (name) game.players[playerIndex].name = name;
+    if (image) game.players[playerIndex].image = image;
 
     // Save to store
     setGame(gameId, game);

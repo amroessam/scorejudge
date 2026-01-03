@@ -3,8 +3,6 @@ import {
   setGame,
   updateGame,
   removeGame,
-  mapTempIdToSheetId,
-  getSheetIdFromTempId,
   getAllGames,
   type GameState,
 } from '@/lib/store';
@@ -31,6 +29,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -56,6 +55,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -66,6 +66,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 1,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -85,6 +86,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -95,6 +97,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -114,6 +117,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: initialTime,
       };
 
@@ -133,6 +137,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -163,6 +168,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now() - 1000,
       };
 
@@ -185,6 +191,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -212,6 +219,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -234,6 +242,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -244,6 +253,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -254,38 +264,6 @@ describe('store', () => {
 
       expect(getGame('game1')).toBeUndefined();
       expect(getGame('game2')).toBeDefined();
-    });
-  });
-
-  describe('tempId mapping', () => {
-    it('should map temp ID to sheet ID', () => {
-      mapTempIdToSheetId('temp_123', 'sheet_abc');
-
-      const sheetId = getSheetIdFromTempId('temp_123');
-      expect(sheetId).toBe('sheet_abc');
-    });
-
-    it('should return undefined for unmapped temp ID', () => {
-      const sheetId = getSheetIdFromTempId('temp_unknown');
-      expect(sheetId).toBeUndefined();
-    });
-
-    it('should allow overwriting temp ID mapping', () => {
-      mapTempIdToSheetId('temp_123', 'sheet_abc');
-      mapTempIdToSheetId('temp_123', 'sheet_xyz');
-
-      const sheetId = getSheetIdFromTempId('temp_123');
-      expect(sheetId).toBe('sheet_xyz');
-    });
-
-    it('should store multiple temp ID mappings independently', () => {
-      mapTempIdToSheetId('temp_1', 'sheet_a');
-      mapTempIdToSheetId('temp_2', 'sheet_b');
-      mapTempIdToSheetId('temp_3', 'sheet_c');
-
-      expect(getSheetIdFromTempId('temp_1')).toBe('sheet_a');
-      expect(getSheetIdFromTempId('temp_2')).toBe('sheet_b');
-      expect(getSheetIdFromTempId('temp_3')).toBe('sheet_c');
     });
   });
 
@@ -300,6 +278,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -328,6 +307,7 @@ describe('store', () => {
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
         operatorEmail: 'operator@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -349,6 +329,7 @@ describe('store', () => {
         currentRoundIndex: 0,
         ownerEmail: 'owner@test.com',
         firstDealerEmail: 'p2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -373,6 +354,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -383,6 +365,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -403,6 +386,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -413,6 +397,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 5,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -433,6 +418,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -453,6 +439,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner1@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 
@@ -463,6 +450,7 @@ describe('store', () => {
         rounds: [],
         currentRoundIndex: 0,
         ownerEmail: 'owner2@test.com',
+        createdAt: Date.now(),
         lastUpdated: Date.now(),
       };
 

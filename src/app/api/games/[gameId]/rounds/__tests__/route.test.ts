@@ -16,21 +16,22 @@ jest.mock('@/lib/csrf', () => ({
   validateCSRF: jest.fn(),
 }));
 
-// Mock Google APIs - must be non-blocking
-jest.mock('@/lib/google', () => ({
-  getGoogleFromToken: jest.fn(),
+jest.mock('@/lib/db', () => ({
+  getGame: jest.fn(),
+  initializeRounds: jest.fn(),
+  saveRoundBids: jest.fn(),
+  saveRoundTricks: jest.fn(),
+  updateGame: jest.fn(),
 }));
 
-jest.mock('googleapis', () => ({
-  google: {
-    sheets: jest.fn(() => ({
-      spreadsheets: {
-        values: {
-          update: jest.fn().mockResolvedValue({}),
-          append: jest.fn().mockResolvedValue({}),
-          clear: jest.fn().mockResolvedValue({}),
-        },
-      },
+jest.mock('@/lib/supabase', () => ({
+  supabaseAdmin: {
+    from: jest.fn(() => ({
+      update: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          eq: jest.fn().mockResolvedValue({ error: null }),
+        })),
+      })),
     })),
   },
 }));
@@ -67,7 +68,7 @@ describe('/api/games/[gameId]/rounds', () => {
         email: `player${i + 1}@test.com`,
       })
     );
-    
+
     return {
       id: 'game1',
       name: 'Test Game',
@@ -80,195 +81,6 @@ describe('/api/games/[gameId]/rounds', () => {
       ...overrides,
     };
   };
-
-  describe('Response time - non-blocking behavior', () => {
-    it('should not await Google Sheets API calls when starting game (START action)', async () => {
-      const { google } = require('googleapis');
-      const mockUpdate = jest.fn().mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 5000)) // Simulate slow API
-      );
-      
-      google.sheets.mockReturnValue({
-        spreadsheets: {
-          values: {
-            update: mockUpdate,
-            append: jest.fn().mockResolvedValue({}),
-          },
-        },
-      });
-
-      const { getGoogleFromToken } = require('@/lib/google');
-      (getGoogleFromToken as jest.Mock).mockReturnValue({});
-
-      (getAuthToken as jest.Mock).mockResolvedValue({
-        id: 'player1',
-        name: 'Player One',
-        email: 'player1@test.com',
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-      });
-
-      const gameState = createGameState(3);
-      setGame('game1', gameState);
-
-      const startTime = Date.now();
-      
-      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'START' }),
-      });
-
-      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
-      const responseTime = Date.now() - startTime;
-      
-      // Response should return in under 100ms even though Google APIs would take 5s
-      // This proves the Google API calls are fire-and-forget (non-blocking)
-      expect(responseTime).toBeLessThan(100);
-      expect(response.status).toBe(200);
-      
-      const data = await response.json();
-      expect(data.success).toBe(true);
-      expect(data.game.currentRoundIndex).toBe(1);
-    });
-
-    it('should not await Google Sheets API calls when submitting bids (BIDS action)', async () => {
-      const { google } = require('googleapis');
-      const mockUpdate = jest.fn().mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 5000)) // Simulate slow API
-      );
-      
-      google.sheets.mockReturnValue({
-        spreadsheets: {
-          values: {
-            update: mockUpdate,
-            append: jest.fn().mockResolvedValue({}),
-          },
-        },
-      });
-
-      const { getGoogleFromToken } = require('@/lib/google');
-      (getGoogleFromToken as jest.Mock).mockReturnValue({});
-
-      (getAuthToken as jest.Mock).mockResolvedValue({
-        id: 'player1',
-        name: 'Player One',
-        email: 'player1@test.com',
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-      });
-
-      // Create game with rounds already initialized (as if START was called)
-      const gameState = createGameState(3, {
-        currentRoundIndex: 1,
-        rounds: [
-          { index: 1, cards: 17, trump: 'S', state: 'BIDDING', bids: {}, tricks: {} },
-        ],
-      });
-      setGame('game1', gameState);
-
-      const startTime = Date.now();
-      
-      // Bids that don't sum to 17 (to satisfy dealer constraint)
-      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'BIDS',
-          inputs: {
-            'player1@test.com': 5,
-            'player2@test.com': 5,
-            'player3@test.com': 5, // Sum = 15, not 17
-          },
-        }),
-      });
-
-      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
-      const responseTime = Date.now() - startTime;
-      
-      expect(responseTime).toBeLessThan(100);
-      expect(response.status).toBe(200);
-      
-      const data = await response.json();
-      expect(data.success).toBe(true);
-      expect(data.game.rounds[0].state).toBe('PLAYING');
-    });
-
-    it('should not await Google Sheets API calls when submitting tricks (TRICKS action)', async () => {
-      const { google } = require('googleapis');
-      const mockUpdate = jest.fn().mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 5000)) // Simulate slow API
-      );
-      const mockAppend = jest.fn().mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 5000)) // Simulate slow API
-      );
-      
-      google.sheets.mockReturnValue({
-        spreadsheets: {
-          values: {
-            update: mockUpdate,
-            append: mockAppend,
-          },
-        },
-      });
-
-      const { getGoogleFromToken } = require('@/lib/google');
-      (getGoogleFromToken as jest.Mock).mockReturnValue({});
-
-      (getAuthToken as jest.Mock).mockResolvedValue({
-        id: 'player1',
-        name: 'Player One',
-        email: 'player1@test.com',
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-      });
-
-      // Create game in PLAYING state
-      const gameState = createGameState(3, {
-        currentRoundIndex: 1,
-        rounds: [
-          {
-            index: 1,
-            cards: 17,
-            trump: 'S',
-            state: 'PLAYING',
-            bids: {
-              'player1@test.com': 5,
-              'player2@test.com': 5,
-              'player3@test.com': 5,
-            },
-            tricks: {},
-          },
-        ],
-      });
-      setGame('game1', gameState);
-
-      const startTime = Date.now();
-      
-      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'TRICKS',
-          inputs: {
-            'player1@test.com': 5, // Made bid
-            'player2@test.com': -1, // Missed bid
-            'player3@test.com': -1, // Missed bid
-          },
-        }),
-      });
-
-      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
-      const responseTime = Date.now() - startTime;
-      
-      expect(responseTime).toBeLessThan(100);
-      expect(response.status).toBe(200);
-      
-      const data = await response.json();
-      expect(data.success).toBe(true);
-      expect(data.game.rounds[0].state).toBe('COMPLETED');
-    });
-  });
 
   describe('Round functionality', () => {
     it('should initialize rounds and set currentRoundIndex to 1 on START', async () => {
@@ -402,7 +214,7 @@ describe('/api/games/[gameId]/rounds', () => {
       const data = await response.json();
 
       expect(response.status).toBe(404);
-      expect(data.error).toContain('not loaded');
+      expect(data.error).toContain('Game not found');
     });
   });
 

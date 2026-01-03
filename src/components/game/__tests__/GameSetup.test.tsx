@@ -30,13 +30,13 @@ global.fetch = jest.fn();
 
 // Mock react-easy-crop
 jest.mock('react-easy-crop', () => {
-    const React = require('react');
-    return function MockCropper({ onCropComplete }: { onCropComplete: (croppedArea: any, croppedAreaPixels: any) => void }) {
-        React.useEffect(() => {
-            onCropComplete({ x: 0, y: 0, width: 100, height: 100 }, { x: 0, y: 0, width: 200, height: 200 });
-        }, [onCropComplete]);
-        return <div data-testid="mock-cropper">Mock Cropper</div>;
-    };
+  const React = require('react');
+  return function MockCropper({ onCropComplete }: { onCropComplete: (croppedArea: any, croppedAreaPixels: any) => void }) {
+    React.useEffect(() => {
+      onCropComplete({ x: 0, y: 0, width: 100, height: 100 }, { x: 0, y: 0, width: 200, height: 200 });
+    }, [onCropComplete]);
+    return <div data-testid="mock-cropper">Mock Cropper</div>;
+  };
 });
 
 describe('GameSetup', () => {
@@ -51,6 +51,7 @@ describe('GameSetup', () => {
     rounds: [],
     currentRoundIndex: 0,
     ownerEmail: 'p1@test.com',
+    createdAt: Date.now(),
     lastUpdated: Date.now(),
   };
 
@@ -81,10 +82,10 @@ describe('GameSetup', () => {
 
     // Mock FileReader that triggers callback synchronously
     const mockFileReaderInstance = {
-      readAsDataURL: jest.fn(function(this: any) {
-          if (this.onloadend) {
-              this.onloadend();
-          }
+      readAsDataURL: jest.fn(function (this: any) {
+        if (this.onloadend) {
+          this.onloadend();
+        }
       }),
       onloadend: null as any,
       result: 'data:image/png;base64,testimage'
@@ -96,12 +97,12 @@ describe('GameSetup', () => {
     });
 
     await waitFor(async () => {
-        fireEvent.change(fileInput);
+      fireEvent.change(fileInput);
     });
 
     await waitFor(() => {
-        // Image cropper should open
-        expect(screen.getByText('Crop Photo')).toBeInTheDocument();
+      // Image cropper should open
+      expect(screen.getByText('Crop Photo')).toBeInTheDocument();
     });
   });
 
@@ -111,60 +112,60 @@ describe('GameSetup', () => {
     // Find avatar for Player 2 (Not current user)
     const player2Container = screen.getByText('Player 2').closest('.bg-\\[var\\(--card\\)\\]');
     const avatarContainer = player2Container?.querySelector('.relative.group.cursor-pointer');
-    
+
     expect(avatarContainer).toBeInTheDocument();
-    
+
     if (avatarContainer) {
-        fireEvent.click(avatarContainer);
-        
-        // Should trigger API call to set dealer to Player 2
-        expect(global.fetch).toHaveBeenCalledWith(
-            expect.stringContaining('/api/games/game1'),
-            expect.objectContaining({
-                method: 'PATCH',
-                body: expect.stringContaining('"firstDealerEmail":"p2@test.com"'),
-            })
-        );
+      fireEvent.click(avatarContainer);
+
+      // Should trigger API call to set dealer to Player 2
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/games/game1'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: expect.stringContaining('"firstDealerEmail":"p2@test.com"'),
+        })
+      );
     }
   });
 
   it('should NOT change dealer when owner clicks OWN avatar (triggers image upload instead)', () => {
-      render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
-      
-      const avatar = screen.getByAltText('Player 1');
-      const avatarContainer = avatar.closest('.group');
-      
-      if (avatarContainer) {
-          fireEvent.click(avatarContainer);
-          
-          // Should NOT trigger API call to set dealer
-          expect(global.fetch).not.toHaveBeenCalledWith(
-              expect.stringContaining('/api/games/game1'),
-              expect.objectContaining({
-                  body: expect.stringContaining('firstDealerEmail'),
-              })
-          );
-      }
+    render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+
+    const avatar = screen.getByAltText('Player 1');
+    const avatarContainer = avatar.closest('.group');
+
+    if (avatarContainer) {
+      fireEvent.click(avatarContainer);
+
+      // Should NOT trigger API call to set dealer
+      expect(global.fetch).not.toHaveBeenCalledWith(
+        expect.stringContaining('/api/games/game1'),
+        expect.objectContaining({
+          body: expect.stringContaining('firstDealerEmail'),
+        })
+      );
+    }
   });
-  
+
   it('should auto-select first player as dealer (no explicit button needed)', () => {
-      // No explicit firstDealerEmail set - first player should be the default dealer
-      const gameStateNoDealer = { ...mockGameState, firstDealerEmail: undefined };
-      render(<GameSetup {...defaultProps} gameState={gameStateNoDealer} currentUserEmail="p1@test.com" />);
-      
-      // First player should show "First Dealer" label
-      expect(screen.getByText('First Dealer')).toBeInTheDocument();
-      
-      // There should be NO "Make First Dealer" buttons
-      expect(screen.queryByText('Make First Dealer')).not.toBeInTheDocument();
+    // No explicit firstDealerEmail set - first player should be the default dealer
+    const gameStateNoDealer = { ...mockGameState, firstDealerEmail: undefined };
+    render(<GameSetup {...defaultProps} gameState={gameStateNoDealer} currentUserEmail="p1@test.com" />);
+
+    // First player should show "First Dealer" label
+    expect(screen.getByText('First Dealer')).toBeInTheDocument();
+
+    // There should be NO "Make First Dealer" buttons
+    expect(screen.queryByText('Make First Dealer')).not.toBeInTheDocument();
   });
-  
+
   it('should show "First Dealer" label on explicitly set dealer', () => {
-      const gameStateWithDealer = { ...mockGameState, firstDealerEmail: 'p2@test.com' };
-      render(<GameSetup {...defaultProps} gameState={gameStateWithDealer} currentUserEmail="p1@test.com" />);
-      
-      // Player 2 should show "First Dealer" label
-      expect(screen.getByText('First Dealer')).toBeInTheDocument();
+    const gameStateWithDealer = { ...mockGameState, firstDealerEmail: 'p2@test.com' };
+    render(<GameSetup {...defaultProps} gameState={gameStateWithDealer} currentUserEmail="p1@test.com" />);
+
+    // Player 2 should show "First Dealer" label
+    expect(screen.getByText('First Dealer')).toBeInTheDocument();
   });
 });
 
