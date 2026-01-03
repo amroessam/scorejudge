@@ -9,15 +9,27 @@ import { supabaseAdmin } from "@/lib/supabase";
 export async function GET(req: NextRequest) {
     const token = await getAuthToken(req);
 
-    if (!token) {
-        console.error('[GET /api/games] No token found');
+    if (!token || !token.email) {
+        console.error('[GET /api/games] No token or email found');
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log('[GET /api/games] Fetching games for user:', { id: token.id, email: token.email });
+    console.log('[GET /api/games] Fetching games for user:', { email: token.email });
 
     try {
-        // Fetch games where user is a player from Supabase
+        // Always fetch the actual DB user ID by email to avoid session token mismatches
+        // This handles cases where older sessions have a different 'id' in their token
+        const user = await getUserByEmail(token.email);
+
+        if (!user) {
+            console.log(`[GET /api/games] No user found for ${token.email}, returning empty list`);
+            return NextResponse.json([]);
+        }
+
+        const dbUserId = user.id;
+        console.log(`[GET /api/games] Using DB User ID: ${dbUserId} for email: ${token.email}`);
+
+        // Fetch games where user is a player from Supabase using the correct DB ID
         const { data: games, error } = await supabaseAdmin
             .from('games')
             .select(`
@@ -27,7 +39,7 @@ export async function GET(req: NextRequest) {
                 current_round_index,
                 game_players!inner(user_id)
             `)
-            .eq('game_players.user_id', token.id);
+            .eq('game_players.user_id', dbUserId);
 
         if (error) {
             console.error('[GET /api/games] Supabase error:', error);

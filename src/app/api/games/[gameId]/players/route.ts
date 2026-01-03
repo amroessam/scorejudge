@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGame, setGame } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
-import { getGame as getDbGame, updateUser } from "@/lib/db";
+import { getGame as getDbGame, updateUser, getUserByEmail } from "@/lib/db";
 
 export async function PATCH(
     req: NextRequest,
@@ -48,11 +48,14 @@ export async function PATCH(
     }
 
     // Update player in database (Users table)
-    // We update the user record so it reflects across all games
-    await updateUser(token.id as string, {
-        display_name: name || undefined,
-        image: image || undefined
-    });
+    // Always lookup user by email to get the correct DB ID, avoiding session mismatch
+    const user = await getUserByEmail(token.email as string);
+    if (user) {
+        await updateUser(user.id, {
+            display_name: name || undefined,
+            image: image || undefined
+        });
+    }
 
     // Update player in memory
     const playerIndex = game.players.findIndex(p => p.email === token.email);
