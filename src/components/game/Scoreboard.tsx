@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-    Settings, 
-    Plus, 
-    Undo2, 
+import {
+    Settings,
+    Plus,
+    Undo2,
     Crown,
     Home,
     Sparkles,
@@ -51,7 +51,7 @@ function getTrumpIcon(trump: string) {
         'H': '♥',
         'NT': 'NT'
     }[trump] || trump;
-    
+
     return <span className={`font-bold ${color}`}>{symbol}</span>;
 }
 
@@ -62,23 +62,30 @@ function getFinalRoundNumber(numPlayers: number): number {
 }
 
 // Helper to get position medal/emoji
-function getPositionIndicator(position: number, totalPlayers: number, currentRoundIndex: number): string | null {
+function getPositionIndicator(score: number, distinctScores: number[], currentRoundIndex: number): string | null {
     // No medals in round 1 (everyone starts at 0)
     if (currentRoundIndex <= 1) return null;
 
-    if (position === 0) return '🥇'; // Gold - 1st place
-    if (position === 1) return '🥈'; // Silver - 2nd place
-    if (position === totalPlayers - 1) return '🏳️‍🌈'; // Last place gets flag (overrides Bronze if 3 players)
-    if (position === 2) return '🥉'; // Bronze - 3rd place (only if not last)
-    
+    const rankIndex = distinctScores.indexOf(score);
+    if (rankIndex === -1) return null;
+
+    // Last place flag (only if there are at least 2 distinct scores)
+    if (distinctScores.length > 1 && rankIndex === distinctScores.length - 1) {
+        return '🏳️‍🌈';
+    }
+
+    if (rankIndex === 0) return '🥇'; // Gold - 1st place
+    if (rankIndex === 1) return '🥈'; // Silver - 2nd place
+    if (rankIndex === 2) return '🥉'; // Bronze - 3rd place
+
     return null;
 }
 
-export function Scoreboard({ 
-    gameId, 
-    gameState, 
-    isOwner, 
-    currentUserEmail, 
+export function Scoreboard({
+    gameId,
+    gameState,
+    isOwner,
+    currentUserEmail,
     onOpenEntry,
     onUndo,
     onOpenSettings,
@@ -89,23 +96,23 @@ export function Scoreboard({
     const [showShare, setShowShare] = useState(false);
     const { players, currentRoundIndex, rounds, firstDealerEmail, name: gameName } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
-    
+
     // Calculate final round and check if game ended
     const finalRoundNumber = getFinalRoundNumber(players.length);
     const completedRounds = rounds.filter((r: any) => r.state === 'COMPLETED');
-    const lastCompletedRound = completedRounds.length > 0 
+    const lastCompletedRound = completedRounds.length > 0
         ? Math.max(...completedRounds.map((r: any) => r.index))
         : 0;
     const isGameEnded = lastCompletedRound >= finalRoundNumber;
-    
+
     const handleCreateNewGame = () => {
         router.push('/create');
     };
-    
+
     const handleGoToDashboard = () => {
         router.push('/dashboard');
     };
-    
+
     // Calculate Dealer
     let firstDealerIndex = 0;
     if (firstDealerEmail) {
@@ -116,10 +123,17 @@ export function Scoreboard({
     const dealer = players[dealerIndex];
 
     const sortedPlayers = [...players].sort((a: Player, b: Player) => b.score - a.score);
-    const leaderEmail = sortedPlayers[0]?.email;
-    const lastPlayer = sortedPlayers[sortedPlayers.length - 1];
-    const isWinner = currentUserEmail === leaderEmail;
-    const isLastPlayer = currentUserEmail === lastPlayer?.email;
+    // Dense ranking: identify distinct scores for tie-aware medals
+    const distinctScores = Array.from(new Set(sortedPlayers.map(p => p.score)));
+    const topScore = distinctScores[0];
+    const bottomScore = distinctScores[distinctScores.length - 1];
+
+    const isWinner = currentUserEmail !== undefined &&
+        players.find((p: Player) => p.email === currentUserEmail)?.score === topScore;
+
+    const isLastPlayer = currentUserEmail !== undefined &&
+        distinctScores.length > 1 &&
+        players.find((p: Player) => p.email === currentUserEmail)?.score === bottomScore;
 
     // Trigger confetti for winner when game ends
     useEffect(() => {
@@ -149,7 +163,7 @@ export function Scoreboard({
                     colors: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A']
                 });
             }, 250);
-            
+
             // Cleanup function to clear interval if component unmounts or dependencies change
             return () => {
                 clearInterval(interval);
@@ -209,7 +223,7 @@ export function Scoreboard({
                                 <span>{activeRound.cards} Cards</span>
                                 <span className="text-[var(--border)]">|</span>
                                 <div className="flex items-center gap-1">
-                                    {getTrumpIcon(activeRound.trump)} 
+                                    {getTrumpIcon(activeRound.trump)}
                                     <span className="text-sm font-normal text-[var(--muted-foreground)]">
                                         {getTrumpFullName(activeRound.trump)}
                                     </span>
@@ -219,7 +233,7 @@ export function Scoreboard({
                     </div>
                     {/* Dashboard button - icon only during rounds */}
                     {!isGameEnded && (
-                        <button 
+                        <button
                             onClick={handleGoToDashboard}
                             className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
                             title="Dashboard"
@@ -235,15 +249,15 @@ export function Scoreboard({
                 {sortedPlayers.map((player: Player, index: number) => {
                     const isDealer = player.email === dealer?.email;
                     const isMe = player.email === currentUserEmail;
-                    const isLast = index === sortedPlayers.length - 1 && isGameEnded;
-                    const positionIndicator = getPositionIndicator(index, sortedPlayers.length, currentRoundIndex);
-                    
+                    const isLast = isGameEnded && distinctScores.length > 1 && player.score === bottomScore;
+                    const positionIndicator = getPositionIndicator(player.score, distinctScores, currentRoundIndex);
+
                     const bid = activeRound?.bids?.[player.email];
                     const tricks = activeRound?.tricks?.[player.email];
                     const hasBid = bid !== undefined;
                     const hasTricks = tricks !== undefined && tricks !== -1;
 
-                     // Calculate W/L History
+                    // Calculate W/L History
                     const history = rounds
                         .filter((r: any) => r.state === 'COMPLETED' && r.bids?.[player.email] !== undefined)
                         .sort((a: any, b: any) => a.index - b.index)
@@ -255,8 +269,8 @@ export function Scoreboard({
                         });
 
                     return (
-                        <div 
-                            key={player.email} 
+                        <div
+                            key={player.email}
                             onClick={() => setSelectedPlayer(player)}
                             className={`
                                 relative p-4 rounded-xl border bg-[var(--card)] transition-all cursor-pointer hover:bg-[var(--secondary)]/50 touch-manipulation
@@ -269,8 +283,8 @@ export function Scoreboard({
                                     {/* Avatar/Dealer Chip */}
                                     <div className="relative shrink-0">
                                         {player.image ? (
-                                            <img 
-                                                src={player.image} 
+                                            <img
+                                                src={player.image}
                                                 alt={player.name}
                                                 className="w-10 h-10 rounded-full object-cover"
                                             />
@@ -285,7 +299,7 @@ export function Scoreboard({
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     <div className="min-w-0 flex-1">
                                         {/* Player Name Row */}
                                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -299,25 +313,24 @@ export function Scoreboard({
                                                 <span className="text-xs font-normal text-[var(--muted-foreground)] font-sans">(You)</span>
                                             )}
                                         </div>
-                                        
+
                                         {/* W/L History Row - separate row with wrapping */}
                                         {history.length > 0 && (
                                             <div className="flex flex-wrap gap-0.5 mt-1 max-w-full">
                                                 {history.map((isWin: boolean, i: number) => (
-                                                    <span 
-                                                        key={i} 
-                                                        className={`text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-sm ${
-                                                            isWin 
-                                                                ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
-                                                                : 'bg-red-500/20 text-red-600 dark:text-red-400'
-                                                        }`}
+                                                    <span
+                                                        key={i}
+                                                        className={`text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-sm ${isWin
+                                                            ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+                                                            : 'bg-red-500/20 text-red-600 dark:text-red-400'
+                                                            }`}
                                                     >
                                                         {isWin ? 'W' : 'L'}
                                                     </span>
                                                 ))}
                                             </div>
                                         )}
-                                        
+
                                         {/* Current Round Stats */}
                                         {activeRound && (
                                             <div className="flex items-center gap-3 text-xs font-mono text-[var(--muted-foreground)] mt-1">
@@ -356,20 +369,20 @@ export function Scoreboard({
                     <div className="flex items-center gap-4 max-w-md mx-auto">
                         {/* Secondary Actions - Only show undo for host, and only if game not ended */}
                         {isOwner && !isGameEnded && (
-                            <button 
+                            <button
                                 onClick={onUndo}
                                 className="p-3 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
                             >
                                 <Undo2 size={24} />
                             </button>
                         )}
-                        
+
                         {/* Primary Action */}
                         {isGameEnded ? (
                             <div className="flex flex-col gap-2 w-full">
                                 <div className="flex gap-2">
                                     {/* Create New Game Button */}
-                                    <button 
+                                    <button
                                         onClick={handleCreateNewGame}
                                         className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                     >
@@ -377,7 +390,7 @@ export function Scoreboard({
                                         New Game
                                     </button>
                                     {/* Dashboard Button */}
-                                    <button 
+                                    <button
                                         onClick={handleGoToDashboard}
                                         className="bg-[var(--secondary)] text-[var(--foreground)] px-6 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                     >
@@ -385,7 +398,7 @@ export function Scoreboard({
                                     </button>
                                 </div>
                                 {/* Share Button */}
-                                <button 
+                                <button
                                     onClick={() => setShowShare(true)}
                                     className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
@@ -395,14 +408,14 @@ export function Scoreboard({
                             </div>
                         ) : isOwner ? (
                             activeRound?.state === 'COMPLETED' && !isGameEnded ? (
-                                <button 
+                                <button
                                     onClick={onNextRound}
                                     className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
                                     Next Round <ArrowRight size={24} />
                                 </button>
                             ) : !isGameEnded ? (
-                                <button 
+                                <button
                                     onClick={onOpenEntry}
                                     className="flex-1 bg-[var(--primary)] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
                                 >
@@ -415,10 +428,10 @@ export function Scoreboard({
                                 Waiting for host...
                             </div>
                         )}
-                        
+
                         {/* Settings - Only show if game not ended */}
                         {!isGameEnded && (
-                            <button 
+                            <button
                                 onClick={onOpenSettings}
                                 className="p-3 rounded-full bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] hover:border-[var(--primary)]/30 active:scale-95 transition-all touch-manipulation shadow-sm"
                             >
@@ -428,14 +441,14 @@ export function Scoreboard({
                     </div>
                 </div>
             </div>
-            
-            <PlayerHistoryOverlay 
-                isOpen={!!selectedPlayer} 
-                onClose={() => setSelectedPlayer(null)} 
+
+            <PlayerHistoryOverlay
+                isOpen={!!selectedPlayer}
+                onClose={() => setSelectedPlayer(null)}
                 player={selectedPlayer}
                 rounds={rounds}
             />
-            
+
             <ScoreShareOverlay
                 isOpen={showShare}
                 onClose={() => setShowShare(false)}
