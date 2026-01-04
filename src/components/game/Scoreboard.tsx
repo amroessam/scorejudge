@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Settings,
     Plus,
@@ -10,7 +10,9 @@ import {
     Sparkles,
     ArrowRight,
     CheckCircle,
-    Share2
+    Share2,
+    Target,
+    Flame
 } from "lucide-react";
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
@@ -18,6 +20,7 @@ import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
 import { ScoreShareOverlay } from "./ScoreShareOverlay";
 import { DECK_SIZE } from "@/lib/config";
 import confetti from "canvas-confetti";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface ScoreboardProps {
     gameId: string;
@@ -97,6 +100,44 @@ export function Scoreboard({
     const { players, currentRoundIndex, rounds, firstDealerEmail, name: gameName } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
 
+    // Store previous scores to detect changes for animation
+    // eslint-disable-next-line
+    const prevScoresRef = useRef<Record<string, number>>({});
+    // eslint-disable-next-line
+    const [scoreDiffs, setScoreDiffs] = useState<Record<string, { val: number, id: number }>>({});
+
+    useEffect(() => {
+        const newDiffs: Record<string, { val: number, id: number }> = {};
+        let hasChanges = false;
+
+        players.forEach((p: Player) => {
+            const prev = prevScoresRef.current[p.email];
+            if (prev !== undefined && prev !== p.score) {
+                newDiffs[p.email] = { val: p.score - prev, id: Date.now() };
+                hasChanges = true;
+            }
+            prevScoresRef.current[p.email] = p.score;
+        });
+
+        if (hasChanges) {
+            setScoreDiffs(prev => ({ ...prev, ...newDiffs }));
+
+            // Clear these specific diffs after a delay to allow animation to play
+            setTimeout(() => {
+                setScoreDiffs(prev => {
+                    const next = { ...prev };
+                    Object.keys(newDiffs).forEach(key => {
+                        // Only delete if it matches the current update ID (prevent race conditions)
+                        if (next[key] && next[key].id === newDiffs[key].id) {
+                            delete next[key];
+                        }
+                    });
+                    return next;
+                });
+            }, 2000);
+        }
+    }, [players]);
+
     // Calculate final round and check if game ended
     const finalRoundNumber = getFinalRoundNumber(players.length);
     const completedRounds = rounds.filter((r: any) => r.state === 'COMPLETED');
@@ -134,6 +175,21 @@ export function Scoreboard({
     const isLastPlayer = currentUserEmail !== undefined &&
         distinctScores.length > 1 &&
         players.find((p: Player) => p.email === currentUserEmail)?.score === bottomScore;
+
+    // --- UX FEATURES LOGIC ---
+
+    // 1. Table Mood
+    let tableMood = null;
+    if (activeRound && activeRound.bids && Object.keys(activeRound.bids).length === players.length) {
+        const totalBids = Object.values(activeRound.bids).reduce((sum: number, b: any) => sum + (b || 0), 0) as number;
+        if (totalBids > activeRound.cards) {
+            tableMood = { text: "Aggressive", icon: "🔥", color: "text-orange-500 bg-orange-500/10 border-orange-500/20" };
+        } else if (totalBids < activeRound.cards) {
+            tableMood = { text: "Tentative", icon: "❄️", color: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20" };
+        } else {
+            tableMood = { text: "Balanced", icon: "⚖️", color: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" };
+        }
+    }
 
     // Trigger confetti for winner when game ends
     useEffect(() => {
@@ -208,9 +264,18 @@ export function Scoreboard({
             <div className="z-10 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--border)] p-4 pt-safe-top">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
-                            {isGameEnded ? 'Game Status' : `Round ${currentRoundIndex}`}
-                        </h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                                {isGameEnded ? 'Game Status' : `Round ${currentRoundIndex}`}
+                            </h2>
+                            {/* Table Mood Indicator */}
+                            {tableMood && !isGameEnded && (
+                                <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 border ${tableMood.color}`}>
+                                    <span>{tableMood.icon}</span>
+                                    <span>{tableMood.text}</span>
+                                </div>
+                            )}
+                        </div>
                         {isGameEnded ? (
                             <div className="flex flex-col items-start mt-1">
                                 <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
@@ -257,16 +322,38 @@ export function Scoreboard({
                     const hasBid = bid !== undefined;
                     const hasTricks = tricks !== undefined && tricks !== -1;
 
-                    // Calculate W/L History
+                    // Calculate W/L History & Streak for Momentum
                     const history = rounds
                         .filter((r: any) => r.state === 'COMPLETED' && r.bids?.[player.email] !== undefined)
                         .sort((a: any, b: any) => a.index - b.index)
                         .map((r: any) => {
-                            const bid = r.bids[player.email];
-                            const tricks = r.tricks?.[player.email];
-                            // Win if bid met exactly, Loss otherwise
-                            return bid === tricks;
+                            const b = r.bids[player.email];
+                            const t = r.tricks?.[player.email];
+                            return b === t;
                         });
+
+                    // 2. Momentum Glow Calculation
+                    let currentStreak = 0;
+                    for (let i = history.length - 1; i >= 0; i--) {
+                        if (history[i]) currentStreak++;
+                        else break;
+                    }
+                    const isOnFire = currentStreak >= 3;
+                    const isGodlike = currentStreak >= 5;
+
+                    // 3. Nemesis Logic: Highlight player directly above user
+                    // Current user logic: calculate rank of current user
+                    let isNemesis = false;
+                    if (currentUserEmail) {
+                        const myPlayerRaw = players.find((p: Player) => p.email === currentUserEmail);
+                        if (myPlayerRaw) {
+                            const myRankIndex = sortedPlayers.findIndex(p => p.email === currentUserEmail);
+                            // Nemesis is key if myRankIndex > 0 (not first) and this player is at myRankIndex - 1
+                            if (myRankIndex > 0 && index === myRankIndex - 1) {
+                                isNemesis = true;
+                            }
+                        }
+                    }
 
                     return (
                         <div
@@ -275,9 +362,20 @@ export function Scoreboard({
                             className={`
                                 relative p-4 rounded-xl border bg-[var(--card)] transition-all cursor-pointer hover:bg-[var(--secondary)]/50 touch-manipulation
                                 ${isMe ? 'border-[var(--primary)]/50 bg-[var(--primary)]/5' : 'border-[var(--border)]'}
-                                ${isLast ? 'border-2 border-purple-500/50 bg-gradient-to-r from-red-500/10 via-yellow-500/10 via-green-500/10 via-blue-500/10 via-indigo-500/10 to-purple-500/10' : ''}
+                                ${isLast ? 'border-2 border-purple-500/50 bg-gradient-to-r from-red-500/10 via-orange-500/10 via-yellow-500/10 via-green-500/10 via-blue-500/10 via-indigo-500/10 to-purple-500/10' : ''}
+                                ${isNemesis && !isMe ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : ''}
+                                ${isOnFire ? 'shadow-[0_0_15px_rgba(249,115,22,0.15)] border-orange-500/30' : ''}
+                                ${isGodlike ? 'shadow-[0_0_20px_rgba(59,130,246,0.25)] border-blue-500/50' : ''}
                             `}
                         >
+                            {/* Nemesis Label */}
+                            {isNemesis && (
+                                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-[10px] font-bold text-white px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1" aria-label="Nemesis Target">
+                                    <Target size={10} />
+                                    <span>NEMESIS</span>
+                                </div>
+                            )}
+
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {/* Avatar/Dealer Chip */}
@@ -286,10 +384,10 @@ export function Scoreboard({
                                             <img
                                                 src={player.image}
                                                 alt={player.name}
-                                                className="w-10 h-10 rounded-full object-cover"
+                                                className={`w-10 h-10 rounded-full object-cover ${isGodlike ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-[var(--card)]' : ''} ${isOnFire && !isGodlike ? 'ring-2 ring-orange-500 ring-offset-2 ring-offset-[var(--card)]' : ''}`}
                                             />
                                         ) : (
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-[var(--secondary)] text-[var(--muted-foreground)]">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold bg-[var(--secondary)] text-[var(--muted-foreground)] ${isGodlike ? 'ring-2 ring-blue-500' : ''} ${isOnFire && !isGodlike ? 'ring-2 ring-orange-500' : ''}`}>
                                                 {player.name.charAt(0)}
                                             </div>
                                         )}
@@ -309,6 +407,13 @@ export function Scoreboard({
                                             {positionIndicator && (
                                                 <span className="text-base">{positionIndicator}</span>
                                             )}
+                                            {/* Momentum Icon */}
+                                            {isGodlike ? (
+                                                <span className="text-sm animate-pulse" title="5+ Streak!">🔵</span>
+                                            ) : isOnFire ? (
+                                                <span className="text-sm animate-bounce" title="3+ Streak!">🔥</span>
+                                            ) : null}
+
                                             {isMe && (
                                                 <span className="text-xs font-normal text-[var(--muted-foreground)] font-sans">(You)</span>
                                             )}
@@ -353,9 +458,26 @@ export function Scoreboard({
                                     </div>
                                 </div>
 
-                                {/* Total Score */}
-                                <div className="text-3xl font-bold tracking-tight font-mono shrink-0">
-                                    {player.score}
+                                {/* Total Score with Floating Animation */}
+                                <div className="relative shrink-0 flex flex-col items-end">
+                                    <div className="text-3xl font-bold tracking-tight font-mono">
+                                        {player.score}
+                                    </div>
+                                    <AnimatePresence>
+                                        {scoreDiffs[player.email] && (
+                                            <motion.div
+                                                key={scoreDiffs[player.email].id}
+                                                initial={{ opacity: 0, y: 10, scale: 0.5 }}
+                                                animate={{ opacity: 1, y: -20, scale: 1.2 }}
+                                                exit={{ opacity: 0, y: -40 }}
+                                                transition={{ duration: 0.8, ease: "easeOut" }}
+                                                className={`absolute top-0 right-0 text-lg font-bold ${scoreDiffs[player.email].val >= 0 ? 'text-green-500' : 'text-red-500'
+                                                    }`}
+                                            >
+                                                {scoreDiffs[player.email].val > 0 ? '+' : ''}{scoreDiffs[player.email].val}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                             </div>
                         </div>

@@ -30,11 +30,16 @@ describe('ScoreShareOverlay', () => {
       />
     );
 
-    // Should appear in header and on button
-    expect(screen.getAllByText('Share Results', { selector: 'h3, button' })).toHaveLength(2);
-    // Game name is uppercased in the share card
-    expect(screen.getByText('TEST GAME')).toBeInTheDocument();
-    expect(screen.getByText('Player One')).toBeInTheDocument();
+    // Should appear in header
+    expect(screen.getByText('Share Results', { selector: 'h3' })).toBeInTheDocument();
+    // Share button should say "Share Image"
+    expect(screen.getByText('Share Image', { selector: 'button' })).toBeInTheDocument();
+
+    // Game name and players should be in the image URL
+    const previewImg = screen.getByAltText('Result Preview') as HTMLImageElement;
+    expect(previewImg).toBeInTheDocument();
+    expect(previewImg.src).toContain('name=Test+Game');
+    expect(previewImg.src).toContain('Player+One');
   });
 
   it('does not render when closed', () => {
@@ -82,7 +87,7 @@ describe('ScoreShareOverlay', () => {
       />
     );
 
-    const shareButton = screen.getByText('Share Results', { selector: 'button' });
+    const shareButton = screen.getByText('Share Image', { selector: 'button' });
 
     await act(async () => {
       fireEvent.click(shareButton);

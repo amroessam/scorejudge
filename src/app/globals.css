@@ -25,22 +25,27 @@
   /* Charcoal Theme */
   --background: #121212;
   --foreground: #ffffff;
-  
+
   --card: #1E1E1E;
   --card-foreground: #ffffff;
-  
-  --primary: #6366F1; /* Indigo 500 */
+
+  --primary: #6366F1;
+  /* Indigo 500 */
   --primary-foreground: #ffffff;
-  
-  --secondary: #27272a; /* Zinc 800 */
+
+  --secondary: #27272a;
+  /* Zinc 800 */
   --secondary-foreground: #fafafa;
-  
-  --muted: #27272a; /* Zinc 800 */
-  --muted-foreground: #a1a1aa; /* Zinc 400 */
-  
-  --destructive: #ef4444; /* Red 500 */
+
+  --muted: #27272a;
+  /* Zinc 800 */
+  --muted-foreground: #a1a1aa;
+  /* Zinc 400 */
+
+  --destructive: #ef4444;
+  /* Red 500 */
   --destructive-foreground: #ffffff;
-  
+
   --border: #27272a;
   --input: #27272a;
   --ring: #6366F1;
@@ -51,15 +56,20 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   -webkit-font-smoothing: antialiased;
-  
-  /* Natural scrolling */
-  min-height: 100vh;
+
+  /* App-like fixed viewport */
+  height: 100dvh;
   width: 100%;
+  overflow: hidden;
+  /* Prevent body scroll, handle internally */
+  overscroll-behavior: none;
+  /* Prevent pull-to-refresh feel if not desired */
 }
 
 html {
-  min-height: 100%;
+  height: 100dvh;
   width: 100%;
+  overflow: hidden;
 }
 
 /* Utilities */
