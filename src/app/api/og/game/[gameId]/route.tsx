@@ -258,14 +258,14 @@ function PlayerRow({ player }: { player: any }) {
 }
 
 function RankBadge({ player }: { player: any }) {
-    const style = { fontSize: 36 };
+    const style = { fontSize: 36, display: 'flex' };
     // Double Rainbow Logic: Rainbow here, Rainbow next to name
     if (player.isLast && !player.isWinner) return <div style={style}>🌈</div>;
 
     if (player.rank === 1) return <div style={style}>🥇</div>;
     if (player.rank === 2) return <div style={style}>🥈</div>;
     if (player.rank === 3) return <div style={style}>🥉</div>;
-    return <div style={{ fontSize: 32, opacity: 0.5, color: '#94A3B8', fontWeight: 800 }}>{player.rank}</div>;
+    return <div style={{ fontSize: 32, opacity: 0.5, color: '#94A3B8', fontWeight: 800, display: 'flex' }}>{player.rank}</div>;
 }
 
 function AvatarWithCrown({ player }: { player: any }) {
@@ -338,7 +338,7 @@ function AvatarImage({ player }: { player: any }) {
                         style={{ objectFit: 'cover' }}
                     />
                 ) : (
-                    <div style={{ fontSize: 28, marginTop: 4 }}>
+                    <div style={{ fontSize: 28, marginTop: 4, display: 'flex' }}>
                         👤
                     </div>
                 )}
@@ -360,15 +360,16 @@ function NameBlock({ player }: { player: any }) {
                 overflow: 'hidden',
             }}
         >
-            <span style={{
+            <div style={{
                 textOverflow: 'ellipsis',
                 overflow: 'hidden',
                 whiteSpace: 'nowrap',
-                color: player.isWinner ? '#Fef3c7' : '#F1F5F9'
-            }}>{player.name}</span>
+                color: player.isWinner ? '#Fef3c7' : '#F1F5F9',
+                display: 'flex',
+            }}>{player.name}</div>
 
             {player.isLast && !player.isWinner && (
-                <span style={{ fontSize: 24 }}>🌈</span>
+                <div style={{ fontSize: 24, display: 'flex' }}>🌈</div>
             )}
         </div>
     );
