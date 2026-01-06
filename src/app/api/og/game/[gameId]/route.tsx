@@ -112,11 +112,11 @@ export async function GET(
                     }}
                 >
                     {/* Background Texture/Noise (Simulated with dots) */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '30px 30px', opacity: 0.5 }}></div>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '30px 30px', opacity: 0.5, display: 'flex' }}></div>
 
                     {/* Neon Accents */}
-                    <div style={{ position: 'absolute', width: 500, height: 500, background: '#6366F1', filter: 'blur(250px)', opacity: 0.15, top: -100, left: -100 }}></div>
-                    <div style={{ position: 'absolute', width: 500, height: 500, background: '#EC4899', filter: 'blur(250px)', opacity: 0.15, bottom: -100, right: -100 }}></div>
+                    <div style={{ position: 'absolute', width: 500, height: 500, background: '#6366F1', filter: 'blur(250px)', opacity: 0.15, top: -100, left: -100, display: 'flex' }}></div>
+                    <div style={{ position: 'absolute', width: 500, height: 500, background: '#EC4899', filter: 'blur(250px)', opacity: 0.15, bottom: -100, right: -100, display: 'flex' }}></div>
 
                     {/* Main Container */}
                     <div
