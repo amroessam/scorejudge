@@ -152,22 +152,34 @@ export function Scoreboard({
 
     const handleShare = async () => {
         setIsSharing(true);
+        console.log('[Scoreboard] Sharing started...');
         try {
             // 1. Fetch image from server
+            console.log(`[Scoreboard] Fetching image from /api/og/game/${gameId}`);
             const response = await fetch(`/api/og/game/${gameId}`);
-            if (!response.ok) throw new Error('Failed to generate image');
+            console.log(`[Scoreboard] Response status: ${response.status}`);
+
+            if (!response.ok) {
+                const text = await response.text();
+                console.error(`[Scoreboard] Server Error: ${text}`);
+                throw new Error(`Failed to generate image: ${response.status}`);
+            }
 
             const blob = await response.blob();
+            console.log(`[Scoreboard] Blob received. Size: ${blob.size}, Type: ${blob.type}`);
             const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
 
             // 2. Share using native API
             if (navigator.share) {
+                console.log('[Scoreboard] Using navigator.share');
                 await navigator.share({
                     files: [file],
                     title: 'ScoreJudge Results',
                     text: `Game results for ${gameName || 'ScoreJudge'}!`
                 });
+                console.log('[Scoreboard] Share successful');
             } else {
+                console.log('[Scoreboard] navigator.share not supported, using download fallback');
                 // Fallback for desktop: Download
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -179,9 +191,10 @@ export function Scoreboard({
                 URL.revokeObjectURL(url);
             }
         } catch (error) {
-            console.error('Share failed:', error);
+            console.error('[Scoreboard] Share failed:', error);
             alert('Failed to share results. Please try again.');
         } finally {
+            console.log('[Scoreboard] Sharing finished');
             setIsSharing(false);
         }
     };

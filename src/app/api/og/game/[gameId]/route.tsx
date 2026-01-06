@@ -12,10 +12,42 @@ export async function GET(
 ) {
     try {
         const { gameId } = await params;
+        const { searchParams } = new URL(request.url);
+        const debug = searchParams.get('debug') === 'true';
+        const start = Date.now();
+        const timings: any = {};
+
+        if (debug) console.log(`[OG] Debug mode enabled for ${gameId}`);
+
         const game = await getGame(gameId);
+        timings.dbFetch = Date.now() - start;
+        console.log(`[OG] Game fetched: ${game ? game.name : 'Not Found'} (${timings.dbFetch}ms)`);
 
         if (!game) {
             return new Response('Game not found', { status: 404 });
+        }
+
+        if (debug) {
+            return Response.json({
+                status: 'ok',
+                game: {
+                    id: game.id,
+                    name: game.name,
+                    players: game.players.length,
+                    rounds: game.rounds.length
+                },
+                timings,
+                env: {
+                    hasSupabase: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+                    nodeEnv: process.env.NODE_ENV,
+                    origin: new URL(request.url).origin
+                },
+                players: game.players.map(p => ({
+                    name: p.name,
+                    hasImage: !!p.image,
+                    imageStart: p.image?.substring(0, 20)
+                }))
+            });
         }
 
         const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score).slice(0, 20);
@@ -72,6 +104,7 @@ export async function GET(
             fontPromise,
             Promise.all(avatarPromises)
         ]);
+        console.log('[OG] Avatar resources fetched.');
 
         const playersWithData = sortedPlayers.map((p, i) => ({
             ...p,
