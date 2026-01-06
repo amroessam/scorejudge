@@ -332,16 +332,19 @@ export function Scoreboard({
                             </div>
                         )}
                     </div>
-                    {/* Dashboard button - icon only during rounds */}
-                    {!isGameEnded && (
-                        <button
-                            onClick={handleGoToDashboard}
-                            className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
-                            title="Dashboard"
-                        >
-                            <Home size={24} />
-                        </button>
-                    )}
+                    {/* Top Right Actions */}
+                    <div className="flex items-center gap-2">
+                        {/* Dashboard button - icon only during rounds */}
+                        {!isGameEnded && (
+                            <button
+                                onClick={handleGoToDashboard}
+                                className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
+                                title="Dashboard"
+                            >
+                                <Home size={24} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 

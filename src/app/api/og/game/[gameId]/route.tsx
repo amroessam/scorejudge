@@ -44,14 +44,25 @@ export async function GET(
                 }
 
                 console.log(`[OG] Fetching avatar for ${p.name}: ${url}`);
-                const response = await fetch(url);
+
+                // 2s Timeout to prevent hanging on dead URLs
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 if (!response.ok) throw new Error(`Status ${response.status}`);
                 const buffer = await response.arrayBuffer();
                 const base64 = Buffer.from(buffer).toString('base64');
                 const contentType = response.headers.get('content-type') || 'image/png';
                 return `data:${contentType};base64,${base64}`;
-            } catch (e) {
-                console.error(`[OG] Failed to fetch avatar for ${p.name}:`, e);
+            } catch (e: any) {
+                if (e.name === 'AbortError') {
+                    console.error(`[OG] Avatar fetch timed out for ${p.name}`);
+                } else {
+                    console.error(`[OG] Failed to fetch avatar for ${p.name}:`, e);
+                }
                 return null;
             }
         });
