@@ -18,7 +18,7 @@ export async function GET(
             return new Response('Game not found', { status: 404 });
         }
 
-        const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score).slice(0, 8);
+        const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score).slice(0, 20);
         const origin = new URL(request.url).origin;
 
         // 1. Fetch Resources (Fonts & Avatars)
@@ -69,6 +69,11 @@ export async function GET(
             isLast: i === sortedPlayers.length - 1 && sortedPlayers.length > 1,
             rank: i + 1,
         }));
+
+        // Dynamic Height Calculation to fit content
+        // Header (~360px) + Padding (~100px) + Rows (N * 110px)
+        const rowHeightTotal = playersWithData.length * 110;
+        const height = 460 + rowHeightTotal;
 
         return new ImageResponse(
             (
@@ -160,7 +165,7 @@ export async function GET(
             ),
             {
                 width: 1080,
-                height: 1080,
+                height: height,
                 fonts: fontData ? [
                     {
                         name: 'Space Grotesk',
