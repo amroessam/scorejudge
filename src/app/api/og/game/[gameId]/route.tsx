@@ -85,6 +85,14 @@ export async function GET(
                 clearTimeout(timeoutId);
 
                 if (!response.ok) throw new Error(`Status ${response.status}`);
+
+                // Safety: Check image size (limit to 2MB)
+                const size = response.headers.get('content-length');
+                if (size && parseInt(size) > 2 * 1024 * 1024) {
+                    console.warn(`[OG] Image too large for ${p.name}: ${size} bytes`);
+                    return null;
+                }
+
                 const buffer = await response.arrayBuffer();
                 const base64 = Buffer.from(buffer).toString('base64');
                 const contentType = response.headers.get('content-type') || 'image/png';
