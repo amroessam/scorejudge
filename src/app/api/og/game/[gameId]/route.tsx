@@ -26,53 +26,14 @@ export async function GET(
         const fontPromise = Promise.resolve(null);
 
         const avatarPromises = sortedPlayers.map(async (p) => {
-            if (!p.image) {
-                console.log(`[OG] No image for player ${p.name}`);
-                return null;
-            }
-
-            // Handle Data URIs directly
-            if (p.image.startsWith('data:')) {
+            // TEMPORARILY DISABLED: Skip all external avatar fetching
+            // This unblocks share card generation while we debug the fetch issue
+            if (p.image && p.image.startsWith('data:')) {
+                // Only use data URIs (already embedded)
                 return p.image;
             }
-
-            try {
-                // Handle Relative URLs
-                let url = p.image;
-                if (url.startsWith('/')) {
-                    url = `${origin}${url}`;
-                }
-
-                console.log(`[OG] Fetching avatar for ${p.name}: ${url}`);
-
-                // 2s Timeout to prevent hanging on dead URLs
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000);
-
-                const response = await fetch(url, { signal: controller.signal });
-                clearTimeout(timeoutId);
-
-                if (!response.ok) throw new Error(`Status ${response.status}`);
-
-                // Safety: Check image size (limit to 2MB)
-                const size = response.headers.get('content-length');
-                if (size && parseInt(size) > 2 * 1024 * 1024) {
-                    console.warn(`[OG] Image too large for ${p.name}: ${size} bytes`);
-                    return null;
-                }
-
-                const buffer = await response.arrayBuffer();
-                const base64 = Buffer.from(buffer).toString('base64');
-                const contentType = response.headers.get('content-type') || 'image/png';
-                return `data:${contentType};base64,${base64}`;
-            } catch (e: any) {
-                if (e.name === 'AbortError') {
-                    console.error(`[OG] Avatar fetch timed out for ${p.name}`);
-                } else {
-                    console.error(`[OG] Failed to fetch avatar for ${p.name}:`, e);
-                }
-                return null;
-            }
+            // Return null for all external URLs - will show 👤 fallback
+            return null;
         });
 
         // Wait for all resources
