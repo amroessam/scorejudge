@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import { createServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
+import { readFileSync, existsSync } from 'fs';
+import path from 'path';
 import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -25,7 +28,13 @@ app.prepare().then(async () => {
     // Run migrations before starting the server
     await runMigrations();
 
-    const server = createServer(async (req, res) => {
+    // Check for SSL certificates
+    const certDir = path.join(process.cwd(), 'certificates');
+    const keyPath = path.join(certDir, 'key.pem');
+    const certPath = path.join(certDir, 'cert.pem');
+    const useHttps = existsSync(keyPath) && existsSync(certPath);
+
+    const requestHandler = async (req: IncomingMessage, res: any) => {
         try {
             const parsedUrl = parse(req.url!, true);
             await handle(req, res, parsedUrl);
@@ -34,7 +43,14 @@ app.prepare().then(async () => {
             res.statusCode = 500;
             res.end('internal server error');
         }
-    });
+    };
+
+    const server = useHttps
+        ? createHttpsServer({
+            key: readFileSync(keyPath),
+            cert: readFileSync(certPath)
+        }, requestHandler)
+        : createServer(requestHandler);
 
     const wss = new WebSocketServer({ noServer: true });
 
@@ -281,6 +297,7 @@ app.prepare().then(async () => {
     });
 
     server.listen(port, () => {
-        console.log(`> Ready on http://${hostname}:${port}`);
+        const protocol = useHttps ? 'https' : 'http';
+        console.log(`> Ready on ${protocol}://${hostname}:${port}`);
     });
 });

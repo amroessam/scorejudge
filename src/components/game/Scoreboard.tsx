@@ -10,14 +10,14 @@ import {
     Sparkles,
     ArrowRight,
     CheckCircle,
-    Share2,
     Target,
-    Flame
+    Flame,
+    Share2,
+    Loader2
 } from "lucide-react";
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
-import { ScoreShareOverlay } from "./ScoreShareOverlay";
 import { DECK_SIZE } from "@/lib/config";
 import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "framer-motion";
@@ -96,7 +96,7 @@ export function Scoreboard({
 }: ScoreboardProps) {
     const router = useRouter();
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-    const [showShare, setShowShare] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
     const { players, currentRoundIndex, rounds, firstDealerEmail, name: gameName } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
 
@@ -148,6 +148,42 @@ export function Scoreboard({
 
     const handleCreateNewGame = () => {
         router.push('/create');
+    };
+
+    const handleShare = async () => {
+        setIsSharing(true);
+        try {
+            // 1. Fetch image from server
+            const response = await fetch(`/api/og/game/${gameId}`);
+            if (!response.ok) throw new Error('Failed to generate image');
+
+            const blob = await response.blob();
+            const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
+
+            // 2. Share using native API
+            if (navigator.share) {
+                await navigator.share({
+                    files: [file],
+                    title: 'ScoreJudge Results',
+                    text: `Game results for ${gameName || 'ScoreJudge'}!`
+                });
+            } else {
+                // Fallback for desktop: Download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'scorejudge-results.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        } catch (error) {
+            console.error('Share failed:', error);
+            alert('Failed to share results. Please try again.');
+        } finally {
+            setIsSharing(false);
+        }
     };
 
     const handleGoToDashboard = () => {
@@ -521,11 +557,12 @@ export function Scoreboard({
                                 </div>
                                 {/* Share Button */}
                                 <button
-                                    onClick={() => setShowShare(true)}
-                                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation"
+                                    onClick={handleShare}
+                                    disabled={isSharing}
+                                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform touch-manipulation disabled:opacity-75"
                                 >
-                                    <Share2 size={20} />
-                                    Share Results
+                                    {isSharing ? <Loader2 size={20} className="animate-spin" /> : <Share2 size={20} />}
+                                    {isSharing ? 'Generating...' : 'Share Results'}
                                 </button>
                             </div>
                         ) : isOwner ? (
@@ -569,13 +606,6 @@ export function Scoreboard({
                 onClose={() => setSelectedPlayer(null)}
                 player={selectedPlayer}
                 rounds={rounds}
-            />
-
-            <ScoreShareOverlay
-                isOpen={showShare}
-                onClose={() => setShowShare(false)}
-                players={players}
-                gameName={gameName || 'Judgement Game'}
             />
         </div>
     );
