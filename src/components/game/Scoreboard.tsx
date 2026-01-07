@@ -146,6 +146,27 @@ export function Scoreboard({
         : 0;
     const isGameEnded = lastCompletedRound >= finalRoundNumber;
 
+    // Pre-fetch share image when game ends to enable instant sharing
+    const [shareImageBlob, setShareImageBlob] = useState<Blob | null>(null);
+    const [shareImageLoading, setShareImageLoading] = useState(false);
+
+    useEffect(() => {
+        if (isGameEnded && !shareImageBlob && !shareImageLoading) {
+            setShareImageLoading(true);
+            console.log('[Scoreboard] Pre-fetching share image...');
+            fetch(`/api/og/game/${gameId}`)
+                .then(res => res.ok ? res.blob() : null)
+                .then(blob => {
+                    if (blob) {
+                        console.log('[Scoreboard] Share image pre-fetched:', blob.size, 'bytes');
+                        setShareImageBlob(blob);
+                    }
+                })
+                .catch(err => console.error('[Scoreboard] Pre-fetch failed:', err))
+                .finally(() => setShareImageLoading(false));
+        }
+    }, [isGameEnded, gameId, shareImageBlob, shareImageLoading]);
+
     const handleCreateNewGame = () => {
         router.push('/create');
     };
@@ -154,31 +175,29 @@ export function Scoreboard({
         setIsSharing(true);
         console.log('[Scoreboard] Sharing started...');
 
-        let blob: Blob | null = null;
+        // Use pre-cached blob if available (enables instant share)
+        let blob: Blob | null = shareImageBlob;
 
-        try {
-            // 1. Fetch image from server
-            console.log(`[Scoreboard] Fetching image from /api/og/game/${gameId}`);
-            const response = await fetch(`/api/og/game/${gameId}`);
-            console.log(`[Scoreboard] Response status: ${response.status}`);
-
-            if (!response.ok) {
-                const text = await response.text();
-                console.error(`[Scoreboard] Server Error: ${text}`);
-                throw new Error(`Failed to generate image: ${response.status}`);
+        if (!blob) {
+            console.log('[Scoreboard] No cached image, fetching...');
+            try {
+                const response = await fetch(`/api/og/game/${gameId}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to generate image: ${response.status}`);
+                }
+                blob = await response.blob();
+                console.log(`[Scoreboard] Fetched blob: ${blob.size} bytes`);
+            } catch (error) {
+                console.error('[Scoreboard] Fetch failed:', error);
+                alert('Failed to generate share image. Please try again.');
+                setIsSharing(false);
+                return;
             }
-
-            blob = await response.blob();
-            console.log(`[Scoreboard] Blob received. Size: ${blob.size}, Type: ${blob.type}`);
-
-        } catch (error) {
-            console.error('[Scoreboard] Fetch failed:', error);
-            alert('Failed to generate share image. Please try again.');
-            setIsSharing(false);
-            return;
+        } else {
+            console.log('[Scoreboard] Using pre-cached image:', blob.size, 'bytes');
         }
 
-        // 2. Try native share, fallback to download
+        // Try native share
         const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
 
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -191,12 +210,18 @@ export function Scoreboard({
                 });
                 console.log('[Scoreboard] Share successful');
             } catch (shareError: any) {
-                console.log('[Scoreboard] Native share failed, using download fallback:', shareError.message);
-                // Fallback to download when share fails (gesture timing issue)
-                downloadImage(blob);
+                // If share fails (gesture timing), download as fallback
+                if (shareError.name === 'NotAllowedError') {
+                    console.log('[Scoreboard] Gesture timing issue, downloading instead');
+                    downloadImage(blob);
+                } else if (shareError.name !== 'AbortError') {
+                    // User cancelled is fine, other errors show download
+                    console.log('[Scoreboard] Share error, downloading:', shareError.message);
+                    downloadImage(blob);
+                }
             }
         } else {
-            console.log('[Scoreboard] navigator.share not available, using download');
+            console.log('[Scoreboard] Navigator.share not available, downloading');
             downloadImage(blob);
         }
 

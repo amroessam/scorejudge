@@ -57,13 +57,25 @@ export async function GET(
 
         const avatars = await Promise.all(avatarPromises);
 
-        const playersWithData = sortedPlayers.map((p, i) => ({
-            ...p,
-            avatar: avatars[i],
-            rank: i + 1,
-            isWinner: i === 0,
-            isLast: i === sortedPlayers.length - 1 && sortedPlayers.length > 1,
-        }));
+        // Dense ranking: players with same score get same rank/medal
+        const distinctScores = Array.from(new Set(sortedPlayers.map(p => p.score))).sort((a, b) => b - a);
+        const topScore = distinctScores[0];
+        const bottomScore = distinctScores[distinctScores.length - 1];
+
+        const playersWithData = sortedPlayers.map((p, i) => {
+            const denseRank = distinctScores.indexOf(p.score) + 1;
+            const isTiedWinner = p.score === topScore;
+            const isLastPlace = p.score === bottomScore && distinctScores.length > 1;
+
+            return {
+                ...p,
+                avatar: avatars[i],
+                rank: denseRank,
+                displayRank: i + 1, // For display numbering
+                isWinner: isTiedWinner,
+                isLast: isLastPlace,
+            };
+        });
 
         // Dynamic height: Header (280px) + rows (90px each) + padding (80px)
         const height = 280 + (playersWithData.length * 90) + 80;
@@ -207,8 +219,8 @@ export async function GET(
                                         display: 'flex',
                                         fontSize: '32px',
                                         fontWeight: 'bold',
-                                        color: player.isWinner ? '#facc15' : '#ffffff',
-                                        textShadow: player.isWinner ? '0 0 20px rgba(234,179,8,0.5)' : 'none',
+                                        color: player.isWinner ? '#facc15' : player.isLast ? '#ec4899' : '#ffffff',
+                                        textShadow: player.isWinner ? '0 0 20px rgba(234,179,8,0.5)' : player.isLast ? '0 0 15px rgba(236,72,153,0.4)' : 'none',
                                     }}>
                                         {player.score}
                                     </div>
