@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle, Users, LogIn, Spade, Heart, Club, Diamond } from "lucide-react";
+import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle, Users, LogIn, Spade, Heart, Club, Diamond, Trophy } from "lucide-react";
 
 interface GameFile {
     id: string;
@@ -383,18 +383,32 @@ export default function Dashboard() {
                         <p className="text-muted-foreground font-medium text-sm md:text-base">Live scorekeeper for Judgement</p>
                     </div>
 
-                    <Link
-                        href="/create"
-                        className="relative group w-full md:w-auto px-6 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] md:hover:scale-105 active:scale-95 shadow-lg hover:shadow-indigo-500/25 flex justify-center items-center"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
-                        <div className="absolute inset-0 border border-white/20 rounded-xl" />
-                        <span className="relative flex items-center gap-2 font-bold text-white tracking-wide">
-                            <Plus size={20} strokeWidth={3} />
-                            <span className="font-[family-name:var(--font-russo)]">NEW GAME</span>
-                        </span>
-                    </Link>
+                    <div className="flex gap-3 w-full md:w-auto">
+                        <Link
+                            href="/create"
+                            className="relative group flex-1 md:flex-none px-6 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] md:hover:scale-105 active:scale-95 shadow-lg hover:shadow-indigo-500/25 flex justify-center items-center"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                            <div className="absolute inset-0 border border-white/20 rounded-xl" />
+                            <span className="relative flex items-center gap-2 font-bold text-white tracking-wide">
+                                <Plus size={20} strokeWidth={3} />
+                                <span className="font-[family-name:var(--font-russo)]">NEW GAME</span>
+                            </span>
+                        </Link>
+                        <Link
+                            href="/leaderboard"
+                            className="relative group flex-1 md:flex-none px-6 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] md:hover:scale-105 active:scale-95 shadow-lg hover:shadow-yellow-500/25 flex justify-center items-center"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                            <div className="absolute inset-0 border border-white/20 rounded-xl" />
+                            <span className="relative flex items-center gap-2 font-bold text-white tracking-wide">
+                                <Trophy size={20} />
+                                <span className="font-[family-name:var(--font-russo)]">LEADERBOARD</span>
+                            </span>
+                        </Link>
+                    </div>
                 </div>
             </header>
 

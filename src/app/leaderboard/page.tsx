@@ -1,0 +1,274 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Trophy, Loader2, Crown, Share2, ArrowLeft, X } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+
+interface LeaderboardEntry {
+    email: string;
+    name: string;
+    image: string | null;
+    gamesPlayed: number;
+    wins: number;
+    secondPlace: number;
+    thirdPlace: number;
+    podiumRate: number;
+    winRate: number;
+    totalScore: number;
+    lastPlaceCount: number;
+}
+
+export default function LeaderboardPage() {
+    const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isSharing, setIsSharing] = useState(false);
+    const [selectedPlayer, setSelectedPlayer] = useState<LeaderboardEntry | null>(null);
+
+    useEffect(() => {
+        fetch("/api/leaderboard")
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.leaderboard) {
+                    setLeaderboard(data.leaderboard);
+                }
+                setLoading(false);
+            })
+            .catch((err) => {
+                console.error("Error fetching leaderboard:", err);
+                setError("Failed to load leaderboard");
+                setLoading(false);
+            });
+    }, []);
+
+    const handleShare = async () => {
+        setIsSharing(true);
+        try {
+            const response = await fetch("/api/og/leaderboard");
+            if (!response.ok) throw new Error("Failed to generate image");
+
+            const blob = await response.blob();
+            const file = new File([blob], "scorejudge-leaderboard.png", { type: "image/png" });
+
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: "ScoreJudge Leaderboard",
+                        text: "Check out the ScoreJudge Global Leaderboard!",
+                    });
+                } catch (shareError: any) {
+                    if (shareError.name === "NotAllowedError" || shareError.name !== "AbortError") {
+                        downloadImage(blob);
+                    }
+                }
+            } else {
+                downloadImage(blob);
+            }
+        } catch (err) {
+            console.error("Share failed:", err);
+            alert("Failed to share leaderboard. Please try again.");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const downloadImage = (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "scorejudge-leaderboard.png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+                <div className="flex items-center gap-2 text-[var(--muted-foreground)]">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span>Loading leaderboard...</span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-[var(--background)] p-4 pb-20">
+            {/* Header */}
+            <div className="max-w-lg mx-auto mb-6">
+                <div className="flex items-center justify-between">
+                    <Link
+                        href="/dashboard"
+                        className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                        <span>Back</span>
+                    </Link>
+                    <button
+                        onClick={handleShare}
+                        disabled={isSharing || leaderboard.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-full font-medium hover:bg-[var(--primary)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isSharing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Share2 className="w-4 h-4" />
+                        )}
+                        Share
+                    </button>
+                </div>
+            </div>
+
+            {/* Title */}
+            <div className="flex items-center justify-center gap-3 mb-6">
+                <Trophy className="w-8 h-8 text-yellow-500" />
+                <h1 className="text-2xl font-bold text-[var(--foreground)]">
+                    Global Leaderboard
+                </h1>
+                <Trophy className="w-8 h-8 text-yellow-500" />
+            </div>
+
+            {error || leaderboard.length === 0 ? (
+                <div className="max-w-lg mx-auto text-center text-[var(--muted-foreground)] py-12">
+                    {error || "No leaderboard data yet. Play at least 3 games to appear!"}
+                </div>
+            ) : (
+                <div className="max-w-lg mx-auto">
+                    {/* Leaderboard Table */}
+                    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-lg">
+                        {/* Table Header */}
+                        <div className="grid grid-cols-[32px_1fr_40px_40px_44px_32px] gap-1 px-3 py-2 bg-[var(--muted)]/30 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
+                            <div className="text-center">#</div>
+                            <div>Player</div>
+                            <div className="text-center">G</div>
+                            <div className="text-center">W</div>
+                            <div className="text-center">%</div>
+                            <div className="text-center">🌈</div>
+                        </div>
+
+                        {/* Table Body */}
+                        <div className="divide-y divide-[var(--border)]">
+                            {leaderboard.map((player, index) => (
+                                <button
+                                    key={player.email}
+                                    onClick={() => setSelectedPlayer(player)}
+                                    className={`w-full grid grid-cols-[32px_1fr_40px_40px_44px_32px] gap-1 px-3 py-2.5 items-center transition-colors hover:bg-white/5 text-left ${index === 0 ? "bg-yellow-500/10" :
+                                        index === 1 ? "bg-gray-400/10" :
+                                            index === 2 ? "bg-orange-600/10" : ""
+                                        }`}
+                                >
+                                    {/* Rank */}
+                                    <div className="text-center text-base">
+                                        {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : (
+                                            <span className="text-[var(--muted-foreground)] text-sm font-medium">{index + 1}</span>
+                                        )}
+                                    </div>
+
+                                    {/* Player */}
+                                    <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                                        <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center">
+                                            {player.image ? (
+                                                <Image src={player.image} alt={player.name} width={24} height={24} className="object-cover" />
+                                            ) : (
+                                                <span className="text-[10px]">👤</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1 min-w-0">
+                                            {index === 0 && <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />}
+                                            <span className={`text-sm font-medium ${index === 0 ? "text-yellow-500" : "text-[var(--foreground)]"}`}>
+                                                {player.name}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Games */}
+                                    <div className="text-center text-sm text-[var(--muted-foreground)]">{player.gamesPlayed}</div>
+
+                                    {/* Wins */}
+                                    <div className="text-center text-sm font-semibold text-[var(--foreground)]">{player.wins}</div>
+
+                                    {/* Win % */}
+                                    <div className="text-center text-sm text-[var(--muted-foreground)]">{player.winRate}%</div>
+
+                                    {/* 🌈 */}
+                                    <div className="text-center text-sm text-pink-500 font-medium">
+                                        {player.lastPlaceCount > 0 ? player.lastPlaceCount : "-"}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <p className="text-center text-xs text-[var(--muted-foreground)] mt-4">
+                        Tap a player to see detailed stats
+                    </p>
+                </div>
+            )}
+
+            {/* Player Detail Modal */}
+            {selectedPlayer && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedPlayer(null)}>
+                    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-6 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full overflow-hidden bg-[var(--muted)] flex items-center justify-center">
+                                    {selectedPlayer.image ? (
+                                        <Image src={selectedPlayer.image} alt={selectedPlayer.name} width={48} height={48} className="object-cover" />
+                                    ) : (
+                                        <span className="text-xl">👤</span>
+                                    )}
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-[var(--foreground)]">{selectedPlayer.name}</h3>
+                                    <p className="text-sm text-[var(--muted-foreground)]">{selectedPlayer.gamesPlayed} games played</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedPlayer(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                                <X className="w-5 h-5 text-[var(--muted-foreground)]" />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20">
+                                <div className="text-2xl font-bold text-yellow-500">{selectedPlayer.wins}</div>
+                                <div className="text-xs text-[var(--muted-foreground)]">🥇 1st Place</div>
+                            </div>
+                            <div className="bg-gray-400/10 rounded-xl p-3 text-center border border-gray-400/20">
+                                <div className="text-2xl font-bold text-gray-400">{selectedPlayer.secondPlace}</div>
+                                <div className="text-xs text-[var(--muted-foreground)]">🥈 2nd Place</div>
+                            </div>
+                            <div className="bg-orange-500/10 rounded-xl p-3 text-center border border-orange-500/20">
+                                <div className="text-2xl font-bold text-orange-500">{selectedPlayer.thirdPlace}</div>
+                                <div className="text-xs text-[var(--muted-foreground)]">🥉 3rd Place</div>
+                            </div>
+                            <div className="bg-pink-500/10 rounded-xl p-3 text-center border border-pink-500/20">
+                                <div className="text-2xl font-bold text-pink-500">{selectedPlayer.lastPlaceCount}</div>
+                                <div className="text-xs text-[var(--muted-foreground)]">🌈 Last Place</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                            <div className="bg-[var(--muted)]/30 rounded-xl p-3 text-center">
+                                <div className="text-xl font-bold text-cyan-400">{selectedPlayer.winRate}%</div>
+                                <div className="text-xs text-[var(--muted-foreground)]">Win Rate</div>
+                            </div>
+                            <div className="bg-[var(--muted)]/30 rounded-xl p-3 text-center">
+                                <div className="text-xl font-bold text-green-400">{selectedPlayer.podiumRate}%</div>
+                                <div className="text-xs text-[var(--muted-foreground)]">Podium Rate</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 bg-[var(--muted)]/20 rounded-xl p-3 text-center">
+                            <div className="text-lg font-bold text-[var(--foreground)]">{selectedPlayer.totalScore}</div>
+                            <div className="text-xs text-[var(--muted-foreground)]">Total Score (All Games)</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

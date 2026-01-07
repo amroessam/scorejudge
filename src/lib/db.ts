@@ -359,6 +359,9 @@ export interface LeaderboardEntry {
     image: string | null;
     gamesPlayed: number;
     wins: number;
+    secondPlace: number;
+    thirdPlace: number;
+    podiumRate: number; // (wins + 2nd + 3rd) / gamesPlayed * 100
     winRate: number;
     totalScore: number;
     lastPlaceCount: number; // 🌈 count
@@ -397,6 +400,8 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         image: string | null;
         gamesPlayed: number;
         wins: number;
+        secondPlace: number;
+        thirdPlace: number;
         totalScore: number;
         lastPlaceCount: number;
     }> = {};
@@ -405,9 +410,9 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         const gamePlayers = game.game_players as any[];
         if (!gamePlayers || gamePlayers.length === 0) continue;
 
-        // Find max and min scores in this game
+        // Get distinct scores sorted descending
         const scores = gamePlayers.map(gp => gp.score || 0);
-        const maxScore = Math.max(...scores);
+        const distinctScores = [...new Set(scores)].sort((a, b) => b - a);
         const minScore = Math.min(...scores);
 
         for (const gp of gamePlayers) {
@@ -416,6 +421,7 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
 
             const email = user.email;
             const score = gp.score || 0;
+            const rank = distinctScores.indexOf(score) + 1;
 
             if (!playerStats[email]) {
                 playerStats[email] = {
@@ -424,6 +430,8 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
                     image: user.image,
                     gamesPlayed: 0,
                     wins: 0,
+                    secondPlace: 0,
+                    thirdPlace: 0,
                     totalScore: 0,
                     lastPlaceCount: 0,
                 };
@@ -432,29 +440,30 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             playerStats[email].gamesPlayed++;
             playerStats[email].totalScore += score;
 
-            // Win if tied for max score
-            if (score === maxScore) {
-                playerStats[email].wins++;
-            }
+            // Track placements
+            if (rank === 1) playerStats[email].wins++;
+            else if (rank === 2) playerStats[email].secondPlace++;
+            else if (rank === 3) playerStats[email].thirdPlace++;
 
-            // Last place if tied for min score (and min != max, i.e., not everyone tied)
-            if (score === minScore && minScore !== maxScore) {
+            // Last place if tied for min score (and not everyone tied)
+            if (score === minScore && distinctScores.length > 1) {
                 playerStats[email].lastPlaceCount++;
             }
         }
     }
 
-    // 4. Convert to array, calculate win rate, filter min 3 games, sort
+    // 4. Convert to array, calculate rates, filter min 3 games, sort
     const leaderboard: LeaderboardEntry[] = Object.values(playerStats)
         .filter(p => p.gamesPlayed >= 3)
         .map(p => ({
             ...p,
             winRate: p.gamesPlayed > 0 ? Math.round((p.wins / p.gamesPlayed) * 100) : 0,
+            podiumRate: p.gamesPlayed > 0 ? Math.round(((p.wins + p.secondPlace + p.thirdPlace) / p.gamesPlayed) * 100) : 0,
         }))
         .sort((a, b) => {
-            // Sort by wins (desc), then win rate (desc), then total score (desc)
+            // Sort by wins (desc), then podium rate (desc), then total score (desc)
             if (b.wins !== a.wins) return b.wins - a.wins;
-            if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+            if (b.podiumRate !== a.podiumRate) return b.podiumRate - a.podiumRate;
             return b.totalScore - a.totalScore;
         });
 
