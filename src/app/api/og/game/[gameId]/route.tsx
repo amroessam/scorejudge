@@ -8,9 +8,15 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ gameId: string }> }
 ) {
+    const startTime = Date.now();
+
     try {
         const { gameId } = await params;
+
+        // 1. Database fetch timing
+        const dbStart = Date.now();
         const game = await getGame(gameId);
+        console.log(`[OG] DB fetch: ${Date.now() - dbStart}ms`);
 
         if (!game) {
             return new Response('Game not found', { status: 404 });
@@ -19,11 +25,12 @@ export async function GET(
         const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score).slice(0, 20);
         const origin = new URL(request.url).origin;
 
-        // Fetch avatars with timeout
+        // 2. Avatar fetching timing
+        const avatarStart = Date.now();
         const avatarPromises = sortedPlayers.map(async (p) => {
             if (!p.image) return null;
 
-            // Use data URIs directly
+            // Use data URIs directly (already embedded - instant)
             if (p.image.startsWith('data:')) {
                 return p.image;
             }
@@ -56,6 +63,7 @@ export async function GET(
         });
 
         const avatars = await Promise.all(avatarPromises);
+        console.log(`[OG] Avatar fetch (${sortedPlayers.length} players): ${Date.now() - avatarStart}ms`);
 
         // Dense ranking: players with same score get same rank/medal
         const distinctScores = Array.from(new Set(sortedPlayers.map(p => p.score))).sort((a, b) => b - a);
@@ -235,6 +243,8 @@ export async function GET(
                 height: height,
             }
         );
+
+        // Note: Can't log after ImageResponse as it streams, but startTime is captured above
     } catch (e: any) {
         console.error('Error generating OG image:', e);
         return new Response(`Failed to generate image: ${e.message}`, { status: 500 });
