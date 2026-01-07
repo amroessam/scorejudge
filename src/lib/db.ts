@@ -361,6 +361,7 @@ export interface LeaderboardEntry {
     wins: number;
     secondPlace: number;
     thirdPlace: number;
+    averagePercentile: number; // Fair ranking: accounts for variable player counts
     podiumRate: number; // (wins + 2nd + 3rd) / gamesPlayed * 100
     winRate: number;
     totalScore: number;
@@ -404,11 +405,14 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         thirdPlace: number;
         totalScore: number;
         lastPlaceCount: number;
+        percentileSum: number; // Sum of percentiles for averaging
     }> = {};
 
     for (const game of completedGames) {
         const gamePlayers = game.game_players as any[];
-        if (!gamePlayers || gamePlayers.length === 0) continue;
+        if (!gamePlayers || gamePlayers.length < 2) continue; // Need at least 2 players
+
+        const numPlayers = gamePlayers.length;
 
         // Get distinct scores sorted descending
         const scores = gamePlayers.map(gp => gp.score || 0);
@@ -423,6 +427,11 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             const score = gp.score || 0;
             const rank = distinctScores.indexOf(score) + 1;
 
+            // Calculate percentile for this game
+            // Formula: (players - rank) / (players - 1) * 100
+            // 1st place = 100%, Last place = 0%
+            const percentile = ((numPlayers - rank) / (numPlayers - 1)) * 100;
+
             if (!playerStats[email]) {
                 playerStats[email] = {
                     email,
@@ -434,11 +443,13 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
                     thirdPlace: 0,
                     totalScore: 0,
                     lastPlaceCount: 0,
+                    percentileSum: 0,
                 };
             }
 
             playerStats[email].gamesPlayed++;
             playerStats[email].totalScore += score;
+            playerStats[email].percentileSum += percentile;
 
             // Track placements
             if (rank === 1) playerStats[email].wins++;
@@ -452,18 +463,27 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         }
     }
 
-    // 4. Convert to array, calculate rates, filter min 3 games, sort
+    // 4. Convert to array, calculate rates, filter min 3 games, sort by averagePercentile
     const leaderboard: LeaderboardEntry[] = Object.values(playerStats)
         .filter(p => p.gamesPlayed >= 3)
         .map(p => ({
-            ...p,
+            email: p.email,
+            name: p.name,
+            image: p.image,
+            gamesPlayed: p.gamesPlayed,
+            wins: p.wins,
+            secondPlace: p.secondPlace,
+            thirdPlace: p.thirdPlace,
+            totalScore: p.totalScore,
+            lastPlaceCount: p.lastPlaceCount,
+            averagePercentile: p.gamesPlayed > 0 ? Math.round(p.percentileSum / p.gamesPlayed) : 0,
             winRate: p.gamesPlayed > 0 ? Math.round((p.wins / p.gamesPlayed) * 100) : 0,
             podiumRate: p.gamesPlayed > 0 ? Math.round(((p.wins + p.secondPlace + p.thirdPlace) / p.gamesPlayed) * 100) : 0,
         }))
         .sort((a, b) => {
-            // Sort by wins (desc), then podium rate (desc), then total score (desc)
+            // Sort by averagePercentile (desc), then wins (desc), then total score (desc)
+            if (b.averagePercentile !== a.averagePercentile) return b.averagePercentile - a.averagePercentile;
             if (b.wins !== a.wins) return b.wins - a.wins;
-            if (b.podiumRate !== a.podiumRate) return b.podiumRate - a.podiumRate;
             return b.totalScore - a.totalScore;
         });
 

@@ -13,6 +13,7 @@ interface LeaderboardEntry {
     wins: number;
     secondPlace: number;
     thirdPlace: number;
+    averagePercentile: number;
     podiumRate: number;
     winRate: number;
     totalScore: number;
@@ -251,20 +252,21 @@ export default function LeaderboardPage() {
                             </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-2 gap-3">
+                        {/* Average Percentile - Main Ranking Stat */}
+                        <div className="mt-4 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-xl p-4 text-center border border-indigo-500/30">
+                            <div className="text-3xl font-bold text-indigo-400">{selectedPlayer.averagePercentile}%</div>
+                            <div className="text-xs text-[var(--muted-foreground)] mt-1">Average Percentile (Ranking Score)</div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3">
                             <div className="bg-[var(--muted)]/30 rounded-xl p-3 text-center">
-                                <div className="text-xl font-bold text-cyan-400">{selectedPlayer.winRate}%</div>
+                                <div className="text-lg font-bold text-cyan-400">{selectedPlayer.winRate}%</div>
                                 <div className="text-xs text-[var(--muted-foreground)]">Win Rate</div>
                             </div>
                             <div className="bg-[var(--muted)]/30 rounded-xl p-3 text-center">
-                                <div className="text-xl font-bold text-green-400">{selectedPlayer.podiumRate}%</div>
+                                <div className="text-lg font-bold text-green-400">{selectedPlayer.podiumRate}%</div>
                                 <div className="text-xs text-[var(--muted-foreground)]">Podium Rate</div>
                             </div>
-                        </div>
-
-                        <div className="mt-4 bg-[var(--muted)]/20 rounded-xl p-3 text-center">
-                            <div className="text-lg font-bold text-[var(--foreground)]">{selectedPlayer.totalScore}</div>
-                            <div className="text-xs text-[var(--muted-foreground)]">Total Score (All Games)</div>
                         </div>
                     </div>
                 </div>
