@@ -10,6 +10,7 @@ interface GameFile {
     id: string;
     name: string;
     createdTime: string;
+    isHidden?: boolean;
 }
 
 interface GameState {
@@ -46,6 +47,7 @@ export default function Dashboard() {
     const [deleting, setDeleting] = useState<string | null>(null);
     const [discoverableGames, setDiscoverableGames] = useState<DiscoverableGame[]>([]);
     const [loadingDiscoverable, setLoadingDiscoverable] = useState(true);
+    const [showHistory, setShowHistory] = useState(false);
 
     // Redirect to sign in if not authenticated
     useEffect(() => {
@@ -76,11 +78,15 @@ export default function Dashboard() {
             });
     };
 
-    // Fetch games on mount
+    // Fetch games on mount or when showHistory changes
     useEffect(() => {
         if (session) {
-            fetch("/api/games")
-                .then((res) => res.json())
+            setLoading(true);
+            fetch(`/api/games?includeHidden=${showHistory}`)
+                .then((res) => {
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    return res.json();
+                })
                 .then((data) => {
                     if (Array.isArray(data)) {
                         // Sort games by creation time, newest first
@@ -107,17 +113,13 @@ export default function Dashboard() {
                     setLoading(false);
                 })
                 .catch((err) => {
-                    console.error(err);
+                    console.error('Error fetching games:', err);
                     setLoading(false);
                 });
-
-            // Fetch discoverable games
-            fetchDiscoverableGames();
         }
-    }, [session]);
+    }, [session, showHistory]);
 
     // Periodic refresh of discoverable games as fallback for WebSocket failures
-    // This ensures users see new games even if their WebSocket connection is unstable
     useEffect(() => {
         if (!session) return;
 
@@ -262,7 +264,7 @@ export default function Dashboard() {
         e.preventDefault();
         e.stopPropagation();
 
-        if (!confirm("Are you sure you want to delete this game? This will permanently delete the game from Google Drive and cannot be undone.")) {
+        if (!confirm("Are you sure you want to remove this game from your dashboard? You can still view it in your history later, and it will count towards the leaderboard.")) {
             return;
         }
 
@@ -462,11 +464,23 @@ export default function Dashboard() {
 
                 {/* My Games Section */}
                 <div className="space-y-4">
-                    <div className="sticky top-0 bg-[var(--background)]/95 backdrop-blur-md py-2 z-10 -mx-2 px-2">
-                        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                            My Games
-                        </h2>
-                        <p className="text-muted-foreground text-sm">Games you've created or joined</p>
+                    <div className="sticky top-0 bg-[var(--background)]/95 backdrop-blur-md py-2 z-10 -mx-2 px-2 flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                                My Games
+                            </h2>
+                            <p className="text-muted-foreground text-sm">Games you've created or joined</p>
+                        </div>
+                        <button
+                            onClick={() => setShowHistory(!showHistory)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${showHistory
+                                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-lg shadow-purple-500/10"
+                                : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-transparent"
+                                }`}
+                        >
+                            <Clock size={16} />
+                            {showHistory ? "Showing History" : "Show History"}
+                        </button>
                     </div>
 
                     {loading ? (
@@ -490,11 +504,18 @@ export default function Dashboard() {
                                         <div key={g.id} className="glass p-5 rounded-xl flex items-center justify-between group hover:scale-[1.01] transition-all">
                                             <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-between">
                                                 <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-1">
+                                                    <div className="flex items-center gap-2 mb-1">
                                                         <h3 className="font-semibold text-lg">{g.name.replace('ScoreJudge - ', '')}</h3>
-                                                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${status.bg} ${status.color} ${status.border || ''}`}>
-                                                            <StatusIcon size={12} />
-                                                            {status.label}
+                                                        <div className="flex gap-2">
+                                                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${status.bg} ${status.color} ${status.border || ''}`}>
+                                                                <StatusIcon size={12} />
+                                                                {status.label}
+                                                            </div>
+                                                            {g.isHidden && (
+                                                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
+                                                                    Hidden
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -518,7 +539,7 @@ export default function Dashboard() {
                                                     onClick={(e) => handleDelete(g.id, e)}
                                                     disabled={isDeleting}
                                                     className="ml-2 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title="Delete game (only for games that haven't started)"
+                                                    title="Remove from dashboard (it will still be in your history)"
                                                 >
                                                     {isDeleting ? (
                                                         <Loader2 className="animate-spin w-5 h-5" />

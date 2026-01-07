@@ -214,6 +214,20 @@ export async function deleteGame(gameId: string) {
     return true;
 }
 
+export async function hideGameForUser(gameId: string, userId: string) {
+    const { error } = await supabaseAdmin
+        .from('game_players')
+        .update({ is_hidden: true })
+        .eq('game_id', gameId)
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error hiding game for user:', error);
+        return false;
+    }
+    return true;
+}
+
 // --- Round Operations ---
 
 export async function saveRound(gameId: string, roundIndex: number, roundData: Partial<Round>) {

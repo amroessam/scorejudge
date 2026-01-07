@@ -29,32 +29,41 @@ export async function GET(req: NextRequest) {
         const dbUserId = user.id;
         console.log(`[GET /api/games] Using DB User ID: ${dbUserId} for email: ${token.email}`);
 
+        const includeHidden = req.nextUrl.searchParams.get('includeHidden') === 'true';
+
         // Fetch games where user is a player from Supabase using the correct DB ID
-        const { data: games, error } = await supabaseAdmin
+        let query = supabaseAdmin
             .from('games')
             .select(`
                 id,
                 name,
                 created_at,
                 current_round_index,
-                game_players!inner(user_id)
+                game_players!inner(user_id, is_hidden)
             `)
             .eq('game_players.user_id', dbUserId);
 
-        if (error) {
-            console.error('[GET /api/games] Supabase error:', error);
-            throw error;
+        if (!includeHidden) {
+            query = query.eq('game_players.is_hidden', false);
         }
 
-        console.log(`[GET /api/games] Found ${games?.length || 0} games for user ${token.email}`);
+        const { data: games, error } = await query;
+
+        if (error) {
+            console.error('[GET /api/games] Supabase error:', error);
+            return NextResponse.json({ error: "Database query failed" }, { status: 500 });
+        }
 
         // Map to format expected by UI
-        return NextResponse.json(games.map(g => ({
+        const mapped = (games || []).map(g => ({
             id: g.id,
             name: g.name,
             createdTime: g.created_at,
-            currentRoundIndex: g.current_round_index
-        })));
+            currentRoundIndex: g.current_round_index,
+            isHidden: (g.game_players as any)?.[0]?.is_hidden || false
+        }));
+
+        return NextResponse.json(mapped);
     } catch (error) {
         console.error('[GET /api/games] Error:', error);
         return NextResponse.json({ error: "Failed to fetch games" }, { status: 500 });

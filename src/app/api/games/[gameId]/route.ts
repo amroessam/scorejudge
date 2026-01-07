@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { setGame, getGame, removeGame, updateGame as updateMemoryGame } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
-import { getGame as getDbGame, updateGame as updateDbGame, deleteGame as deleteDbGame } from "@/lib/db";
+import { getGame as getDbGame, updateGame as updateDbGame, deleteGame as deleteDbGame, hideGameForUser, getUserByEmail } from "@/lib/db";
 
 export async function GET(
     req: NextRequest,
@@ -120,25 +120,19 @@ export async function DELETE(
             return NextResponse.json({ error: "Game not found" }, { status: 404 });
         }
 
-        // 2. Check if user is the owner
-        if (game.ownerEmail !== token.email) {
-            return NextResponse.json({
-                error: "Only the game owner can delete the game"
-            }, { status: 403 });
+        // 2. Get user
+        const user = await getUserByEmail(token.email as string);
+        if (!user) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        // 3. Delete from Supabase
-        await deleteDbGame(gameId);
+        // 3. Hide for this user instead of hard deleting
+        await hideGameForUser(gameId, user.id);
 
-        // 4. Broadcast discovery update BEFORE removing from memory
-        if ((global as any).broadcastDiscoveryUpdate) {
-            (global as any).broadcastDiscoveryUpdate('GAME_DELETED', game);
-        }
+        // 4. Remove from memory cache if they are the last one using it or if it's the owner
+        // For simplicity, we just remove it from the specific user's view in dashboard next time they fetch
 
-        // 5. Remove from memory
-        removeGame(gameId);
-
-        return NextResponse.json({ success: true, message: "Game deleted successfully" });
+        return NextResponse.json({ success: true, message: "Game removed from your view" });
     } catch (e: any) {
         console.error("Error deleting game:", e);
         return NextResponse.json({
