@@ -84,12 +84,12 @@ export function GlobalLeaderboard() {
                         <div
                             key={player.email}
                             className={`grid grid-cols-[40px_1fr_50px_50px_50px_40px] gap-2 px-4 py-3 items-center transition-colors ${index === 0
-                                    ? "bg-yellow-500/10"
-                                    : index === 1
-                                        ? "bg-gray-400/10"
-                                        : index === 2
-                                            ? "bg-orange-600/10"
-                                            : ""
+                                ? "bg-yellow-500/10"
+                                : index === 1
+                                    ? "bg-gray-400/10"
+                                    : index === 2
+                                        ? "bg-orange-600/10"
+                                        : ""
                                 }`}
                         >
                             {/* Rank */}
@@ -130,8 +130,8 @@ export function GlobalLeaderboard() {
                                     )}
                                     <span
                                         className={`truncate text-sm font-medium ${index === 0
-                                                ? "text-yellow-500"
-                                                : "text-[var(--foreground)]"
+                                            ? "text-yellow-500"
+                                            : "text-[var(--foreground)]"
                                             }`}
                                     >
                                         {player.name}

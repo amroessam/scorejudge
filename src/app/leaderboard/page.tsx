@@ -172,7 +172,7 @@ export default function LeaderboardPage() {
                                     {/* Player */}
                                     <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                                         <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center">
-                                            {player.image && player.image.startsWith('http') ? (
+                                            {player.image ? (
                                                 <Image src={player.image} alt={player.name} width={24} height={24} className="object-cover" />
                                             ) : (
                                                 <span className="text-[10px]">👤</span>
@@ -217,7 +217,7 @@ export default function LeaderboardPage() {
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-full overflow-hidden bg-[var(--muted)] flex items-center justify-center">
-                                    {selectedPlayer.image && selectedPlayer.image.startsWith('http') ? (
+                                    {selectedPlayer.image ? (
                                         <Image src={selectedPlayer.image} alt={selectedPlayer.name} width={48} height={48} className="object-cover" />
                                     ) : (
                                         <span className="text-xl">👤</span>

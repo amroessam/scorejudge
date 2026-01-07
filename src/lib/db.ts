@@ -447,9 +447,12 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             const percentile = ((numPlayers - rank) / (numPlayers - 1)) * 100;
 
             if (!playerStats[email]) {
+                // Determine best name to show: display_name -> name -> email prefix
+                const displayName = user.display_name || user.name || (email ? email.split('@')[0] : 'Unknown');
+
                 playerStats[email] = {
                     email,
-                    name: user.display_name || user.name || 'Unknown',
+                    name: displayName,
                     image: user.image,
                     gamesPlayed: 0,
                     wins: 0,
