@@ -350,3 +350,113 @@ export async function initializeRounds(gameId: string, rounds: Round[], players:
 
     return true;
 }
+
+// --- Leaderboard Operations ---
+
+export interface LeaderboardEntry {
+    email: string;
+    name: string;
+    image: string | null;
+    gamesPlayed: number;
+    wins: number;
+    winRate: number;
+    totalScore: number;
+    lastPlaceCount: number; // 🌈 count
+}
+
+export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
+    // 1. Get all completed games with their players and scores
+    const { data: games, error } = await supabaseAdmin
+        .from('games')
+        .select(`
+            id,
+            game_players(
+                score,
+                user:users(id, email, name, display_name, image)
+            ),
+            rounds(state)
+        `)
+        .gte('created_at', '2026-01-01');
+
+    if (error || !games) {
+        console.error('Error fetching games for leaderboard:', error);
+        return [];
+    }
+
+    // 2. Filter to only completed games (last round is COMPLETED)
+    const completedGames = games.filter(game => {
+        const rounds = game.rounds as { state: string }[];
+        if (!rounds || rounds.length === 0) return false;
+        return rounds.some(r => r.state === 'COMPLETED');
+    });
+
+    // 3. Aggregate stats per player (by email)
+    const playerStats: Record<string, {
+        email: string;
+        name: string;
+        image: string | null;
+        gamesPlayed: number;
+        wins: number;
+        totalScore: number;
+        lastPlaceCount: number;
+    }> = {};
+
+    for (const game of completedGames) {
+        const gamePlayers = game.game_players as any[];
+        if (!gamePlayers || gamePlayers.length === 0) continue;
+
+        // Find max and min scores in this game
+        const scores = gamePlayers.map(gp => gp.score || 0);
+        const maxScore = Math.max(...scores);
+        const minScore = Math.min(...scores);
+
+        for (const gp of gamePlayers) {
+            const user = gp.user;
+            if (!user || !user.email) continue;
+
+            const email = user.email;
+            const score = gp.score || 0;
+
+            if (!playerStats[email]) {
+                playerStats[email] = {
+                    email,
+                    name: user.display_name || user.name || 'Unknown',
+                    image: user.image,
+                    gamesPlayed: 0,
+                    wins: 0,
+                    totalScore: 0,
+                    lastPlaceCount: 0,
+                };
+            }
+
+            playerStats[email].gamesPlayed++;
+            playerStats[email].totalScore += score;
+
+            // Win if tied for max score
+            if (score === maxScore) {
+                playerStats[email].wins++;
+            }
+
+            // Last place if tied for min score (and min != max, i.e., not everyone tied)
+            if (score === minScore && minScore !== maxScore) {
+                playerStats[email].lastPlaceCount++;
+            }
+        }
+    }
+
+    // 4. Convert to array, calculate win rate, filter min 3 games, sort
+    const leaderboard: LeaderboardEntry[] = Object.values(playerStats)
+        .filter(p => p.gamesPlayed >= 3)
+        .map(p => ({
+            ...p,
+            winRate: p.gamesPlayed > 0 ? Math.round((p.wins / p.gamesPlayed) * 100) : 0,
+        }))
+        .sort((a, b) => {
+            // Sort by wins (desc), then win rate (desc), then total score (desc)
+            if (b.wins !== a.wins) return b.wins - a.wins;
+            if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+            return b.totalScore - a.totalScore;
+        });
+
+    return leaderboard;
+}
