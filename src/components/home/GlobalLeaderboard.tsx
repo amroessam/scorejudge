@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Trophy, Loader2, Crown } from "lucide-react";
 import Image from "next/image";
 
+import { getAvatarUrl } from "@/lib/utils";
+
 interface LeaderboardEntry {
     email: string;
     name: string;
@@ -110,18 +112,15 @@ export function GlobalLeaderboard() {
                             {/* Player */}
                             <div className="flex items-center gap-2 min-w-0">
                                 {/* Avatar */}
-                                <div className="w-8 h-8 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center">
-                                    {player.image ? (
-                                        <Image
-                                            src={player.image}
-                                            alt={player.name}
-                                            width={32}
-                                            height={32}
-                                            className="object-cover"
-                                        />
-                                    ) : (
-                                        <span className="text-sm">👤</span>
-                                    )}
+                                <div className="w-8 h-8 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center border border-[var(--border)]/50">
+                                    <Image
+                                        src={getAvatarUrl(player.image)}
+                                        alt={player.name}
+                                        width={32}
+                                        height={32}
+                                        className="object-cover"
+                                        unoptimized={getAvatarUrl(player.image).startsWith('data:')}
+                                    />
                                 </div>
                                 {/* Name + Crown for #1 */}
                                 <div className="flex items-center gap-1 min-w-0">

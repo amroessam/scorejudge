@@ -5,6 +5,8 @@ import { Trophy, Loader2, Crown, Share2, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
+import { getAvatarUrl } from "@/lib/utils";
+
 interface LeaderboardEntry {
     email: string;
     name: string;
@@ -171,12 +173,15 @@ export default function LeaderboardPage() {
 
                                     {/* Player */}
                                     <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-                                        <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center">
-                                            {player.image ? (
-                                                <Image src={player.image} alt={player.name} width={24} height={24} className="object-cover" />
-                                            ) : (
-                                                <span className="text-[10px]">👤</span>
-                                            )}
+                                        <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center border border-[var(--border)]/50">
+                                            <Image
+                                                src={getAvatarUrl(player.image)}
+                                                alt={player.name}
+                                                width={24}
+                                                height={24}
+                                                className="object-cover"
+                                                unoptimized={getAvatarUrl(player.image).startsWith('data:')}
+                                            />
                                         </div>
                                         <div className="flex items-center gap-1 min-w-0">
                                             {index === 0 && <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />}
@@ -216,12 +221,15 @@ export default function LeaderboardPage() {
                     <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-6 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full overflow-hidden bg-[var(--muted)] flex items-center justify-center">
-                                    {selectedPlayer.image ? (
-                                        <Image src={selectedPlayer.image} alt={selectedPlayer.name} width={48} height={48} className="object-cover" />
-                                    ) : (
-                                        <span className="text-xl">👤</span>
-                                    )}
+                                <div className="w-12 h-12 rounded-full overflow-hidden bg-[var(--muted)] flex items-center justify-center border border-[var(--border)]/50">
+                                    <Image
+                                        src={getAvatarUrl(selectedPlayer.image)}
+                                        alt={selectedPlayer.name}
+                                        width={48}
+                                        height={48}
+                                        className="object-cover"
+                                        unoptimized={getAvatarUrl(selectedPlayer.image).startsWith('data:')}
+                                    />
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-bold text-[var(--foreground)]">{selectedPlayer.name}</h3>

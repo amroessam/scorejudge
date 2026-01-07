@@ -21,6 +21,7 @@ import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
 import { DECK_SIZE } from "@/lib/config";
 import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "framer-motion";
+import { getAvatarUrl } from "@/lib/utils";
 
 interface ScoreboardProps {
     gameId: string;
@@ -487,17 +488,11 @@ export function Scoreboard({
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {/* Avatar/Dealer Chip */}
                                     <div className="relative shrink-0">
-                                        {player.image ? (
-                                            <img
-                                                src={player.image}
-                                                alt={player.name}
-                                                className={`w-10 h-10 rounded-full object-cover ${isGodlike ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-[var(--card)]' : ''} ${isOnFire && !isGodlike ? 'ring-2 ring-orange-500 ring-offset-2 ring-offset-[var(--card)]' : ''}`}
-                                            />
-                                        ) : (
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold bg-[var(--secondary)] text-[var(--muted-foreground)] ${isGodlike ? 'ring-2 ring-blue-500' : ''} ${isOnFire && !isGodlike ? 'ring-2 ring-orange-500' : ''}`}>
-                                                {player.name.charAt(0)}
-                                            </div>
-                                        )}
+                                        <img
+                                            src={getAvatarUrl(player.image)}
+                                            alt={player.name}
+                                            className={`w-10 h-10 rounded-full object-cover ${isGodlike ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-[var(--card)]' : ''} ${isOnFire && !isGodlike ? 'ring-2 ring-orange-500 ring-offset-2 ring-offset-[var(--card)]' : ''}`}
+                                        />
                                         {isDealer && (
                                             <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-md flex items-center justify-center border-2 border-white dark:border-gray-800">
                                                 <span className="text-[9px] font-bold text-white">D</span>
