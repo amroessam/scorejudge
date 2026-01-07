@@ -151,19 +151,33 @@ export function Scoreboard({
     const [shareImageLoading, setShareImageLoading] = useState(false);
 
     useEffect(() => {
+        // Guard for test environment where fetch may not be available
+        if (typeof window === 'undefined') return;
+
         if (isGameEnded && !shareImageBlob && !shareImageLoading) {
             setShareImageLoading(true);
             console.log('[Scoreboard] Pre-fetching share image...');
-            fetch(`/api/og/game/${gameId}`)
-                .then(res => res.ok ? res.blob() : null)
-                .then(blob => {
-                    if (blob) {
-                        console.log('[Scoreboard] Share image pre-fetched:', blob.size, 'bytes');
-                        setShareImageBlob(blob);
-                    }
-                })
-                .catch(err => console.error('[Scoreboard] Pre-fetch failed:', err))
-                .finally(() => setShareImageLoading(false));
+
+            try {
+                const fetchResult = fetch(`/api/og/game/${gameId}`);
+                // Guard against mocked/undefined fetch in tests
+                if (fetchResult && typeof fetchResult.then === 'function') {
+                    fetchResult
+                        .then(res => res.ok ? res.blob() : null)
+                        .then(blob => {
+                            if (blob) {
+                                console.log('[Scoreboard] Share image pre-fetched:', blob.size, 'bytes');
+                                setShareImageBlob(blob);
+                            }
+                        })
+                        .catch(err => console.error('[Scoreboard] Pre-fetch failed:', err))
+                        .finally(() => setShareImageLoading(false));
+                } else {
+                    setShareImageLoading(false);
+                }
+            } catch {
+                setShareImageLoading(false);
+            }
         }
     }, [isGameEnded, gameId, shareImageBlob, shareImageLoading]);
 
