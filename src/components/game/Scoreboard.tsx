@@ -153,6 +153,9 @@ export function Scoreboard({
     const handleShare = async () => {
         setIsSharing(true);
         console.log('[Scoreboard] Sharing started...');
+
+        let blob: Blob | null = null;
+
         try {
             // 1. Fetch image from server
             console.log(`[Scoreboard] Fetching image from /api/og/game/${gameId}`);
@@ -165,38 +168,51 @@ export function Scoreboard({
                 throw new Error(`Failed to generate image: ${response.status}`);
             }
 
-            const blob = await response.blob();
+            blob = await response.blob();
             console.log(`[Scoreboard] Blob received. Size: ${blob.size}, Type: ${blob.type}`);
-            const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
 
-            // 2. Share using native API
-            if (navigator.share) {
-                console.log('[Scoreboard] Using navigator.share');
+        } catch (error) {
+            console.error('[Scoreboard] Fetch failed:', error);
+            alert('Failed to generate share image. Please try again.');
+            setIsSharing(false);
+            return;
+        }
+
+        // 2. Try native share, fallback to download
+        const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
+
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                console.log('[Scoreboard] Attempting navigator.share');
                 await navigator.share({
                     files: [file],
                     title: 'ScoreJudge Results',
                     text: `Game results for ${gameName || 'ScoreJudge'}!`
                 });
                 console.log('[Scoreboard] Share successful');
-            } else {
-                console.log('[Scoreboard] navigator.share not supported, using download fallback');
-                // Fallback for desktop: Download
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'scorejudge-results.png';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            } catch (shareError: any) {
+                console.log('[Scoreboard] Native share failed, using download fallback:', shareError.message);
+                // Fallback to download when share fails (gesture timing issue)
+                downloadImage(blob);
             }
-        } catch (error) {
-            console.error('[Scoreboard] Share failed:', error);
-            alert('Failed to share results. Please try again.');
-        } finally {
-            console.log('[Scoreboard] Sharing finished');
-            setIsSharing(false);
+        } else {
+            console.log('[Scoreboard] navigator.share not available, using download');
+            downloadImage(blob);
         }
+
+        console.log('[Scoreboard] Sharing finished');
+        setIsSharing(false);
+    };
+
+    const downloadImage = (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'scorejudge-results.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     const handleGoToDashboard = () => {
