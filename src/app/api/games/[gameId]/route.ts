@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { setGame, getGame, removeGame, updateGame as updateMemoryGame } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
-import { getGame as getDbGame, updateGame as updateDbGame, deleteGame as deleteDbGame, hideGameForUser, getUserByEmail } from "@/lib/db";
+import { getGame as getDbGame, updateGame as updateDbGame, deleteGame as deleteDbGame, hideGameForUser, getUserByEmail, removePlayerFromGame } from "@/lib/db";
 
 export async function GET(
     req: NextRequest,
@@ -126,17 +126,42 @@ export async function DELETE(
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        // 3. Hide for this user instead of hard deleting
-        await hideGameForUser(gameId, user.id);
+        const isOwner = game.ownerEmail === token.email;
+        const isCompleted = game.rounds.some(r => r.state === 'COMPLETED');
 
-        // 4. Remove from memory cache if they are the last one using it or if it's the owner
-        // For simplicity, we just remove it from the specific user's view in dashboard next time they fetch
+        if (isCompleted) {
+            // Soft delete: Hide for this user but keep data for history/leaderboard
+            await hideGameForUser(gameId, user.id);
+            return NextResponse.json({ success: true, message: "Game hidden from your view" });
+        } else {
+            // Incomplete game logic
+            if (isOwner) {
+                // Hard delete: Remove for everyone if host deletes incomplete game
+                await deleteDbGame(gameId);
+                removeGame(gameId); // Clear from memory store
+                return NextResponse.json({ success: true, message: "Game deleted for all players" });
+            } else {
+                // Leave game: Remove this player from the game
+                await removePlayerFromGame(gameId, user.id);
 
-        return NextResponse.json({ success: true, message: "Game removed from your view" });
+                // Update memory store if game is cached
+                const memGame = getGame(gameId);
+                if (memGame && memGame.players) {
+                    memGame.players = memGame.players.filter(p => p.id !== user.id);
+                    setGame(gameId, memGame);
+                    // Broadcast update to other players so they see someone left
+                    if ((global as any).broadcastGameUpdate) {
+                        (global as any).broadcastGameUpdate(gameId, memGame);
+                    }
+                }
+
+                return NextResponse.json({ success: true, message: "You have left the game" });
+            }
+        }
     } catch (e: any) {
         console.error("Error deleting game:", e);
         return NextResponse.json({
-            error: `Failed to delete game: ${e?.message || 'Unknown error'}`
+            error: `Failed to process game deletion: ${e?.message || 'Unknown error'}`
         }, { status: 500 });
     }
 }

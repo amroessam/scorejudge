@@ -105,6 +105,20 @@ export async function addPlayer(gameId: string, userId: string, order: number) {
     return true;
 }
 
+export async function removePlayerFromGame(gameId: string, userId: string) {
+    const { error } = await supabaseAdmin
+        .from('game_players')
+        .delete()
+        .eq('game_id', gameId)
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error removing player from game:', error);
+        return false;
+    }
+    return true;
+}
+
 export async function getGame(gameId: string): Promise<GameState | null> {
     const { data: game, error } = await supabaseAdmin
         .from('games')

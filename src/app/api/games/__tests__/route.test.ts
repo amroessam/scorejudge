@@ -43,7 +43,16 @@ describe('GET /api/games', () => {
 
     it('should filter out hidden games by default', async () => {
         const mockGames = [
-            { id: '1', name: 'Game 1', game_players: [{ is_hidden: false }] },
+            {
+                id: '1',
+                name: 'Game 1',
+                created_at: '2026-01-01',
+                current_round_index: 0,
+                owner: { email: 'host@test.com' },
+                game_players: [{ is_hidden: false }],
+                all_players: [{ count: 1 }],
+                rounds: []
+            },
         ];
 
         // Mock the resolved value for the games query
@@ -52,7 +61,12 @@ describe('GET /api/games', () => {
         });
 
         const req = new NextRequest('http://localhost/api/games');
-        await GET(req);
+        const res = await GET(req);
+        const data = await res.json();
+
+        // Verify response structure
+        expect(data[0]).toHaveProperty('isCompleted');
+        expect(data[0].playerCount).toBe(1);
 
         // Verify it filtered by the user's ID
         expect(supabaseAdmin.eq).toHaveBeenCalledWith('game_players.user_id', 'user-123');

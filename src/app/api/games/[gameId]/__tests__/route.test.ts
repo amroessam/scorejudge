@@ -3,7 +3,7 @@
  */
 import { NextRequest } from 'next/server';
 import { DELETE } from '../route';
-import { setGame, getGame, type GameState, type Player } from '@/lib/store';
+import { setGame, type GameState, type Player } from '@/lib/store';
 import { getAuthToken } from '@/lib/auth-utils';
 import { validateCSRF } from '@/lib/csrf';
 
@@ -22,6 +22,7 @@ jest.mock('@/lib/db', () => ({
   deleteGame: jest.fn(),
   getUserByEmail: jest.fn(),
   hideGameForUser: jest.fn(),
+  removePlayerFromGame: jest.fn(),
 }));
 
 describe('/api/games/[gameId] DELETE', () => {
@@ -39,7 +40,7 @@ describe('/api/games/[gameId] DELETE', () => {
   });
 
   const createMockPlayer = (overrides?: Partial<Player>): Player => ({
-    id: 'player1',
+    id: 'user1',
     name: 'Player One',
     email: 'player1@test.com',
     tricks: 0,
@@ -60,16 +61,14 @@ describe('/api/games/[gameId] DELETE', () => {
     ...overrides,
   });
 
-  it('should allow a user to hide a game from their view', async () => {
+  it('should hard delete if owner deletes incomplete game', async () => {
     (getAuthToken as jest.Mock).mockResolvedValue({
-      id: 'player1',
-      name: 'Player One',
+      id: 'user1',
       email: 'player1@test.com',
     });
 
-    const { getUserByEmail, hideGameForUser } = require('@/lib/db');
+    const { getUserByEmail, deleteGame } = require('@/lib/db');
     (getUserByEmail as jest.Mock).mockResolvedValue({ id: 'user1', email: 'player1@test.com' });
-    (hideGameForUser as jest.Mock).mockResolvedValue(true);
 
     const gameState = createGameState();
     setGame('game1', gameState);
@@ -83,21 +82,18 @@ describe('/api/games/[gameId] DELETE', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(hideGameForUser).toHaveBeenCalledWith('game1', 'user1');
+    expect(deleteGame).toHaveBeenCalledWith('game1');
   });
 
-  it('should allow any player (not just owner) to hide a game', async () => {
+  it('should remove player if non-owner deletes incomplete game', async () => {
     (getAuthToken as jest.Mock).mockResolvedValue({
-      id: 'player2',
-      name: 'Player Two',
+      id: 'user2',
       email: 'player2@test.com',
     });
 
-    const { getUserByEmail, hideGameForUser } = require('@/lib/db');
+    const { getUserByEmail, removePlayerFromGame } = require('@/lib/db');
     (getUserByEmail as jest.Mock).mockResolvedValue({ id: 'user2', email: 'player2@test.com' });
-    (hideGameForUser as jest.Mock).mockResolvedValue(true);
 
-    // Player 1 is owner, but Player 2 is calling DELETE
     const gameState = createGameState({ ownerEmail: 'player1@test.com' });
     setGame('game1', gameState);
 
@@ -110,23 +106,22 @@ describe('/api/games/[gameId] DELETE', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(hideGameForUser).toHaveBeenCalledWith('game1', 'user2');
+    expect(removePlayerFromGame).toHaveBeenCalledWith('game1', 'user2');
   });
 
-  it('should return 401 if user is not authenticated', async () => {
-    (getAuthToken as jest.Mock).mockResolvedValue(null);
-
-    const req = new NextRequest('http://localhost:3000/api/games/game1', {
-      method: 'DELETE',
+  it('should hide game if any user deletes completed game', async () => {
+    (getAuthToken as jest.Mock).mockResolvedValue({
+      id: 'user1',
+      email: 'player1@test.com',
     });
 
-    const response = await DELETE(req, { params: Promise.resolve({ gameId: 'game1' }) });
+    const { getUserByEmail, hideGameForUser } = require('@/lib/db');
+    (getUserByEmail as jest.Mock).mockResolvedValue({ id: 'user1', email: 'player1@test.com' });
 
-    expect(response.status).toBe(401);
-  });
-
-  it('should return 403 if CSRF validation fails', async () => {
-    (validateCSRF as jest.Mock).mockReturnValue(false);
+    const gameState = createGameState({
+      rounds: [{ index: 1, state: 'COMPLETED', trump: 'H', cards: 5 }]
+    });
+    setGame('game1', gameState);
 
     const req = new NextRequest('http://localhost:3000/api/games/game1', {
       method: 'DELETE',
@@ -135,7 +130,8 @@ describe('/api/games/[gameId] DELETE', () => {
     const response = await DELETE(req, { params: Promise.resolve({ gameId: 'game1' }) });
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data.error).toBe('CSRF validation failed');
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(hideGameForUser).toHaveBeenCalledWith('game1', 'user1');
   });
 });

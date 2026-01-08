@@ -96,139 +96,180 @@ export async function GET(
                         flexDirection: 'column',
                         width: '100%',
                         height: '100%',
-                        background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d0d1f 100%)',
-                        padding: '40px',
+                        background: '#050510',
+                        padding: '30px',
                         fontFamily: 'sans-serif',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                 >
-                    {/* Neon glow effects */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)', display: 'flex' }} />
-                    <div style={{ position: 'absolute', bottom: 0, right: 0, width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(236,72,153,0.3) 0%, transparent 70%)', display: 'flex' }} />
-
-                    {/* Main card container */}
+                    {/* Main Card Frame */}
                     <div
                         style={{
                             display: 'flex',
                             flexDirection: 'column',
                             width: '100%',
                             height: '100%',
-                            background: 'linear-gradient(180deg, rgba(30,30,60,0.9) 0%, rgba(20,20,40,0.95) 100%)',
-                            borderRadius: '32px',
-                            border: '2px solid rgba(99,102,241,0.4)',
-                            boxShadow: '0 0 60px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
-                            padding: '32px 40px',
+                            background: 'linear-gradient(180deg, #101025 0%, #0a0a1a 100%)',
+                            borderRadius: '40px',
+                            border: '2px solid rgba(167, 139, 250, 0.3)',
+                            boxShadow: '0 20px 80px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.1)',
+                            padding: '40px 30px',
+                            alignItems: 'center',
+                            position: 'relative',
                             overflow: 'hidden',
                         }}
                     >
+                        {/* Decorative Glow */}
+                        <div style={{ position: 'absolute', top: '-100px', left: '-100px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(167, 139, 250, 0.15) 0%, transparent 70%)', display: 'flex' }} />
+
                         {/* Header */}
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
-                            <div style={{ display: 'flex', fontSize: '56px', fontWeight: 'bold', color: '#6366f1', letterSpacing: '-2px', textShadow: '0 0 40px rgba(99,102,241,0.6)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px' }}>
+                            <div style={{
+                                display: 'flex',
+                                fontSize: '60px',
+                                fontWeight: '900',
+                                color: '#ffffff',
+                                letterSpacing: '4px',
+                                textTransform: 'uppercase',
+                                textShadow: '0 0 15px rgba(167, 139, 250, 0.6)',
+                            }}>
                                 SCOREJUDGE
                             </div>
-                            <div style={{ display: 'flex', fontSize: '22px', color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '4px', marginTop: '8px', textShadow: '0 0 20px rgba(34,211,238,0.5)' }}>
-                                {game.name || 'Game Results'}
+                            <div style={{
+                                display: 'flex',
+                                fontSize: '20px',
+                                color: '#a78bfa',
+                                textTransform: 'uppercase',
+                                letterSpacing: '8px',
+                                marginTop: '4px',
+                                fontWeight: '700',
+                                opacity: 0.8,
+                            }}>
+                                {game.name || 'RESULTS'}
                             </div>
-                            {/* Card suits */}
-                            <div style={{ display: 'flex', gap: '24px', marginTop: '16px', fontSize: '28px' }}>
-                                <div style={{ display: 'flex', color: '#e2e8f0', filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.3))' }}>♠</div>
-                                <div style={{ display: 'flex', color: '#ef4444', filter: 'drop-shadow(0 0 8px rgba(239,68,68,0.5))' }}>♥</div>
-                                <div style={{ display: 'flex', color: '#e2e8f0', filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.3))' }}>♣</div>
-                                <div style={{ display: 'flex', color: '#ef4444', filter: 'drop-shadow(0 0 8px rgba(239,68,68,0.5))' }}>♦</div>
+
+                            {/* Suit Symbols Row */}
+                            <div style={{ display: 'flex', gap: '20px', marginTop: '16px', fontSize: '24px', opacity: 0.8 }}>
+                                <div style={{ display: 'flex', color: '#4466ff' }}>♠</div>
+                                <div style={{ display: 'flex', color: '#ff4466' }}>♥</div>
+                                <div style={{ display: 'flex', color: '#44ff66' }}>♣</div>
+                                <div style={{ display: 'flex', color: '#ffaa44' }}>♦</div>
                             </div>
                         </div>
 
                         {/* Players list */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                            {playersWithData.map((player) => (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '680px' }}>
+                            {playersWithData.slice(0, 5).map((player, i) => (
                                 <div
                                     key={player.id}
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        padding: '12px 20px',
+                                        padding: '14px 24px',
                                         background: player.isWinner
-                                            ? 'linear-gradient(90deg, rgba(234,179,8,0.2) 0%, rgba(234,179,8,0.05) 100%)'
-                                            : player.isLast
-                                                ? 'linear-gradient(90deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.03) 100%)'
-                                                : 'rgba(255,255,255,0.03)',
-                                        borderRadius: '16px',
+                                            ? 'linear-gradient(90deg, rgba(234,179,8,0.15) 0%, rgba(234,179,8,0.02) 100%)'
+                                            : 'rgba(255,255,255,0.03)',
+                                        borderRadius: '24px',
                                         border: player.isWinner
-                                            ? '2px solid rgba(234,179,8,0.5)'
-                                            : player.isLast
-                                                ? '1px solid rgba(239,68,68,0.3)'
-                                                : '1px solid rgba(255,255,255,0.08)',
-                                        boxShadow: player.isWinner ? '0 0 30px rgba(234,179,8,0.15)' : 'none',
+                                            ? '2px solid rgba(234,179,8,0.6)'
+                                            : '1px solid rgba(255,255,255,0.06)',
+                                        boxShadow: player.isWinner ? '0 0 30px rgba(234,179,8,0.1)' : 'none',
                                     }}
                                 >
                                     {/* Rank */}
-                                    <div style={{ display: 'flex', width: '50px', justifyContent: 'center', fontSize: '28px' }}>
-                                        {player.isLast && !player.isWinner ? '🌈' :
-                                            player.rank === 1 ? '🥇' :
-                                                player.rank === 2 ? '🥈' :
-                                                    player.rank === 3 ? '🥉' :
-                                                        <div style={{ display: 'flex', fontSize: '20px', color: '#64748b', fontWeight: 'bold' }}>{player.rank}</div>}
+                                    <div style={{ display: 'flex', width: '50px', justifyContent: 'center', alignItems: 'center' }}>
+                                        {player.isLast && !player.isWinner ? <div style={{ display: 'flex', fontSize: '24px' }}>🌈</div> :
+                                            player.rank === 1 ? (
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style={{ display: 'flex' }}>
+                                                    <path d="M12 15C15.3137 15 18 12.3137 18 9V2H6V9C6 12.3137 8.68629 15 12 15Z" fill="#fbbf24" opacity="0.9" />
+                                                    <path d="M12 15V22M7 22H17M6 4H4C2.89543 4 2 4.89543 2 6V7C2 9.20914 3.79086 11 6 11M18 4H20C21.1046 4 22 4.89543 22 6V7C22 9.20914 20.2091 11 18 11" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                            ) : player.rank === 2 ? (
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style={{ display: 'flex' }}>
+                                                    <path d="M12 15C15.3137 15 18 12.3137 18 9V2H6V9C6 12.3137 8.68629 15 12 15Z" fill="#cbd5e1" opacity="0.9" />
+                                                    <path d="M12 15V22M7 22H17M6 4H4C2.89543 4 2 4.89543 2 6V7C2 9.20914 3.79086 11 6 11M18 4H20C21.1046 4 22 4.89543 22 6V7C22 9.20914 20.2091 11 18 11" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                            ) : player.rank === 3 ? (
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style={{ display: 'flex' }}>
+                                                    <path d="M12 15C15.3137 15 18 12.3137 18 9V2H6V9C6 12.3137 8.68629 15 12 15Z" fill="#b45309" opacity="0.9" />
+                                                    <path d="M12 15V22M7 22H17M6 4H4C2.89543 4 2 4.89543 2 6V7C2 9.20914 3.79086 11 6 11M18 4H20C21.1046 4 22 4.89543 22 6V7C22 9.20914 20.2091 11 18 11" stroke="#b45309" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                            ) : (
+                                                <div style={{ display: 'flex', fontSize: '18px', color: '#64748b', fontWeight: 'bold' }}>{player.rank}</div>
+                                            )
+                                        }
                                     </div>
 
                                     {/* Avatar */}
-                                    <div style={{ display: 'flex', marginLeft: '12px' }}>
+                                    <div style={{ display: 'flex', marginLeft: '12px', position: 'relative' }}>
+                                        {player.isWinner && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '-24px',
+                                                left: '12px',
+                                                fontSize: '44px',
+                                                zIndex: 10,
+                                            }}>👑</div>
+                                        )}
                                         <div
                                             style={{
                                                 display: 'flex',
-                                                width: '52px',
-                                                height: '52px',
+                                                width: '74px',
+                                                height: '74px',
                                                 borderRadius: '50%',
-                                                background: player.isWinner
-                                                    ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)'
-                                                    : player.isLast
-                                                        ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)'
-                                                        : 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-                                                padding: '3px',
-                                                boxShadow: player.isWinner ? '0 0 15px rgba(234,179,8,0.4)' : 'none',
+                                                background: player.isWinner ? '#eab308' : 'rgba(255,255,255,0.1)',
+                                                padding: '2px',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
                                             }}
                                         >
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    borderRadius: '50%',
-                                                    background: '#1a1a3e',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    overflow: 'hidden',
-                                                }}
-                                            >
+                                            <div style={{
+                                                display: 'flex',
+                                                width: '100%',
+                                                height: '100%',
+                                                borderRadius: '50%',
+                                                overflow: 'hidden',
+                                                background: '#0a0a1a',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
                                                 {player.avatar ? (
                                                     <img src={player.avatar} width="100%" height="100%" style={{ objectFit: 'cover' }} />
                                                 ) : (
-                                                    <div style={{ display: 'flex', fontSize: '22px' }}>👤</div>
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        fontSize: '28px',
+                                                        fontWeight: 'bold',
+                                                        color: player.isWinner ? '#facc15' : '#6366f1'
+                                                    }}>
+                                                        {player.name[0].toUpperCase()}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Name + crown/rainbow */}
-                                    <div style={{ display: 'flex', flex: 1, marginLeft: '16px', alignItems: 'center', gap: '8px' }}>
-                                        {player.isWinner && <div style={{ display: 'flex', fontSize: '20px' }}>👑</div>}
-                                        <div style={{
-                                            display: 'flex',
-                                            fontSize: '20px',
-                                            fontWeight: '600',
-                                            color: player.isWinner ? '#fef3c7' : '#f1f5f9',
-                                            textShadow: player.isWinner ? '0 0 10px rgba(234,179,8,0.3)' : 'none',
-                                        }}>
-                                            {player.name}
-                                        </div>
-                                        {player.isLast && !player.isWinner && <div style={{ display: 'flex', fontSize: '18px' }}>🌈</div>}
+                                    {/* Name */}
+                                    <div style={{
+                                        display: 'flex',
+                                        flex: 1,
+                                        marginLeft: '20px',
+                                        fontSize: '24px',
+                                        fontWeight: '600',
+                                        color: player.isWinner ? '#fef3c7' : '#ffffff',
+                                        alignItems: 'center',
+                                    }}>
+                                        {player.name}
+                                        {player.isLast && !player.isWinner && <span style={{ marginLeft: '8px', fontSize: '20px', opacity: 0.9 }}>🌈</span>}
                                     </div>
 
                                     {/* Score */}
                                     <div style={{
                                         display: 'flex',
-                                        fontSize: '32px',
-                                        fontWeight: 'bold',
-                                        color: player.isWinner ? '#facc15' : player.isLast ? '#ec4899' : '#ffffff',
-                                        textShadow: player.isWinner ? '0 0 20px rgba(234,179,8,0.5)' : player.isLast ? '0 0 15px rgba(236,72,153,0.4)' : 'none',
+                                        fontSize: '38px',
+                                        fontWeight: '900',
+                                        color: player.isWinner ? '#facc15' : 'white',
                                     }}>
                                         {player.score}
                                     </div>
@@ -239,8 +280,8 @@ export async function GET(
                 </div>
             ),
             {
-                width: 800,
-                height: height,
+                width: 750,
+                height: Math.max(850, 100 + (Math.min(playersWithData.length, 5) * 125) + 100),
             }
         );
 

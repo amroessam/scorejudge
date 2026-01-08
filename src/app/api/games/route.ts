@@ -4,6 +4,13 @@ import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { createGame, getUserByEmail, upsertUser, addPlayer } from "@/lib/db";
 import { supabaseAdmin } from "@/lib/supabase";
+import { DECK_SIZE } from "@/lib/config";
+
+function getFinalRoundNumber(numPlayers: number): number {
+    if (!numPlayers) return 12;
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
+    return maxCards * 2 - 1;
+}
 
 // Using Route Handler for data fetching to keep credentials server-side
 export async function GET(req: NextRequest) {
@@ -41,7 +48,8 @@ export async function GET(req: NextRequest) {
                 current_round_index,
                 owner:users!owner_id(email),
                 game_players!inner(user_id, is_hidden),
-                all_players:game_players(count)
+                all_players:game_players(count),
+                rounds:rounds(state, round_index)
             `)
             .eq('game_players.user_id', dbUserId);
 
@@ -57,15 +65,23 @@ export async function GET(req: NextRequest) {
         }
 
         // Map to format expected by UI
-        const mapped = (games || []).map(g => ({
-            id: g.id,
-            name: g.name,
-            createdTime: g.created_at,
-            currentRoundIndex: g.current_round_index,
-            isHidden: (g.game_players as any)?.[0]?.is_hidden || false,
-            ownerEmail: (g.owner as any)?.email,
-            playerCount: (g.all_players as any)?.[0]?.count || 0
-        }));
+        const mapped = (games || []).map(g => {
+            const playerCount = (g.all_players as any)?.[0]?.count || 0;
+            const finalRound = getFinalRoundNumber(playerCount);
+            const rounds = (g.rounds as any[]) || [];
+            const isCompleted = rounds.some(r => r.state === 'COMPLETED' && r.round_index >= finalRound);
+
+            return {
+                id: g.id,
+                name: g.name,
+                createdTime: g.created_at,
+                currentRoundIndex: g.current_round_index,
+                isHidden: (g.game_players as any)?.[0]?.is_hidden || false,
+                ownerEmail: (g.owner as any)?.email,
+                playerCount,
+                isCompleted
+            };
+        });
 
         return NextResponse.json(mapped);
     } catch (error) {

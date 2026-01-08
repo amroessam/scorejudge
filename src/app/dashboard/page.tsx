@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle, Users, LogIn, Spade, Heart, Club, Diamond, Trophy } from "lucide-react";
+import { Plus, ArrowRight, Loader2, Trash2, Clock, CheckCircle, PlayCircle, AlertCircle, Users, LogIn, Spade, Heart, Club, Diamond, Trophy, History, ChevronRight } from "lucide-react";
 
 interface GameFile {
     id: string;
@@ -14,6 +14,7 @@ interface GameFile {
     ownerEmail: string;
     playerCount: number;
     currentRoundIndex: number;
+    isCompleted?: boolean;
 }
 
 interface GameState {
@@ -105,16 +106,16 @@ export default function Dashboard() {
                     setLoading(false);
                 });
         }
-    }, [session, showHistory, router]); // Added router to dependencies for safety
+    }, [session, showHistory, router]);
 
-    // Periodic refresh of discoverable games as fallback for WebSocket failures
+    // Periodic refresh of discoverable games
     useEffect(() => {
         if (!session) return;
 
         // Initial fetch
         fetchDiscoverableGames();
 
-        // Refresh discoverable games every 30 seconds as a fallback
+        // Refresh discoverable games every 30 seconds
         const refreshInterval = setInterval(() => {
             fetchDiscoverableGames();
         }, 30000);
@@ -133,7 +134,7 @@ export default function Dashboard() {
         let reconnectTimeout: NodeJS.Timeout | null = null;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
-        const reconnectDelay = 3000; // 3 seconds
+        const reconnectDelay = 3000;
 
         const connect = () => {
             try {
@@ -141,14 +142,13 @@ export default function Dashboard() {
 
                 socket.onopen = () => {
                     console.log('[Discovery] WebSocket connected');
-                    reconnectAttempts = 0; // Reset on successful connection
+                    reconnectAttempts = 0;
                 };
 
                 socket.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
 
-                        // Check for error messages from server
                         if (data.type === 'ERROR') {
                             console.error('[Discovery] WebSocket server error:', data.message);
                             return;
@@ -157,28 +157,12 @@ export default function Dashboard() {
                         if (data.type === 'DISCOVERY_UPDATE') {
                             console.log('[Discovery] Received update:', data);
 
-                            // Handle deletion updates immediately (remove from local state)
                             if (data.updateType === 'GAME_DELETED' && data.game) {
                                 setDiscoverableGames((prev) =>
                                     prev.filter((g) => g.id !== data.game.id)
                                 );
                             } else {
-                                // For creation/update, refresh the full list to get sorted order
-                                fetch("/api/games/discover")
-                                    .then((res) => {
-                                        if (!res.ok) {
-                                            throw new Error('Failed to fetch discoverable games');
-                                        }
-                                        return res.json();
-                                    })
-                                    .then((data: DiscoverableGame[]) => {
-                                        if (Array.isArray(data)) {
-                                            setDiscoverableGames(data);
-                                        }
-                                    })
-                                    .catch((err) => {
-                                        console.error('Error fetching discoverable games:', err);
-                                    });
+                                fetchDiscoverableGames();
                             }
                         }
                     } catch (e) {
@@ -188,7 +172,7 @@ export default function Dashboard() {
 
                 socket.onerror = (event) => {
                     if (process.env.NODE_ENV === 'development') {
-                        console.log('[Discovery] WebSocket error event (connection issue, will attempt reconnect):', event);
+                        console.log('[Discovery] WebSocket error event:', event);
                     }
                 };
 
@@ -222,6 +206,10 @@ export default function Dashboard() {
         };
     }, [session]);
 
+    const handleJoin = (gameId: string) => {
+        router.push(`/game/${gameId}`);
+    };
+
     const handleDelete = async (gameId: string, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -244,7 +232,6 @@ export default function Dashboard() {
                 return;
             }
 
-            // Remove from local state
             setGames((prev) => prev.filter((g) => g.id !== gameId));
             setGameStates((prev) => {
                 const newState = { ...prev };
@@ -259,21 +246,8 @@ export default function Dashboard() {
         }
     };
 
-    const hasGameStarted = (game: GameFile): boolean => {
-        const state = gameStates[game.id];
-        if (state) {
-            return state.currentRoundIndex > 0 ||
-                (state.rounds !== undefined && state.rounds !== null && state.rounds.some((r: any) => r.state === 'COMPLETED' || r.state === 'PLAYING'));
-        }
-        return game.currentRoundIndex > 0;
-    };
-
     const canDelete = (game: GameFile): boolean => {
-        const state = gameStates[game.id];
-        if (state) {
-            return state.ownerEmail === session?.user?.email;
-        }
-        return game.ownerEmail === session?.user?.email;
+        return true;
     };
 
     const getGameStatus = (game: GameFile) => {
@@ -283,13 +257,12 @@ export default function Dashboard() {
         const currentRoundIndex = state?.currentRoundIndex ?? game.currentRoundIndex ?? 0;
         const finalRound = getFinalRoundNumber(numPlayers);
 
-        // Determine if game is completed
         const completedRounds = state?.rounds?.filter(r => r.state === 'COMPLETED') || [];
         const lastCompletedRound = completedRounds.length > 0
             ? Math.max(...completedRounds.map(r => r.index))
             : 0;
 
-        const isCompleted = lastCompletedRound >= finalRound && numPlayers > 0;
+        const isCompleted = game.isCompleted || (lastCompletedRound >= finalRound && numPlayers > 0);
 
         if (isCompleted) {
             return {
@@ -320,7 +293,6 @@ export default function Dashboard() {
         };
     };
 
-    // Show loading state while checking authentication or redirecting
     if (status === 'loading' || !session) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -330,9 +302,9 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="h-full flex flex-col max-w-4xl mx-auto">
-            {/* Fixed Header */}
-            <header className="flex-none p-4 md:p-6 bg-[var(--background)]/95 backdrop-blur-md z-10 border-b border-[var(--border)]">
+        <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground font-sans">
+            {/* Header - Fixed */}
+            <header className="p-4 md:p-6 pb-2 border-b border-white/5 relative z-10 shrink-0">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
                     <div>
                         <div className="flex items-center gap-2 md:gap-3 mb-1">
@@ -349,177 +321,192 @@ export default function Dashboard() {
                         <p className="text-muted-foreground font-medium text-sm md:text-base">Live scorekeeper for Judgement</p>
                     </div>
 
-                    <div className="flex gap-3 w-full md:w-auto">
+                    <div className="grid grid-cols-2 gap-3 w-full md:w-80">
                         <Link
                             href="/create"
-                            className="relative group flex-1 md:flex-none px-6 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] md:hover:scale-105 active:scale-95 shadow-lg hover:shadow-indigo-500/25 flex justify-center items-center"
+                            className="relative group px-4 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg hover:shadow-indigo-500/25 flex justify-center items-center overflow-hidden"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 opacity-90 group-hover:opacity-100 transition-opacity" />
                             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
                             <div className="absolute inset-0 border border-white/20 rounded-xl" />
-                            <span className="relative flex items-center gap-2 font-bold text-white tracking-wide">
-                                <Plus size={20} strokeWidth={3} />
+                            <span className="relative flex items-center gap-2 font-bold text-white tracking-wide text-sm whitespace-nowrap">
+                                <Plus size={18} strokeWidth={3} />
                                 <span className="font-[family-name:var(--font-russo)]">NEW GAME</span>
                             </span>
                         </Link>
                         <Link
                             href="/leaderboard"
-                            className="relative group flex-1 md:flex-none px-6 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] md:hover:scale-105 active:scale-95 shadow-lg hover:shadow-yellow-500/25 flex justify-center items-center"
+                            className="relative group px-4 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg hover:shadow-yellow-500/25 flex justify-center items-center overflow-hidden"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-600 to-orange-600 opacity-90 group-hover:opacity-100 transition-opacity" />
                             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
                             <div className="absolute inset-0 border border-white/20 rounded-xl" />
-                            <span className="relative flex items-center gap-2 font-bold text-white tracking-wide">
-                                <Trophy size={20} />
-                                <span className="font-[family-name:var(--font-russo)]">LEADERBOARD</span>
+                            <span className="relative flex items-center gap-2 font-bold text-white tracking-wide text-sm whitespace-nowrap">
+                                <Trophy size={18} />
+                                <span className="font-[family-name:var(--font-russo)]">STATS</span>
                             </span>
                         </Link>
                     </div>
                 </div>
             </header>
 
-            {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 safe-pb">
-                {/* Discover Games Section */}
-                <div className="space-y-4">
-                    <div className="sticky top-0 bg-[var(--background)]/95 backdrop-blur-md py-2 z-10 -mx-2 px-2">
-                        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-600">
-                            Discover Games
-                        </h2>
-                        <p className="text-muted-foreground text-sm">Join games that haven't started yet</p>
-                    </div>
+            {/* Dashboard Content - Non-scrolling body, internal scroll for games */}
+            <main className="flex-1 overflow-hidden p-4 md:p-6 flex flex-col gap-6 safe-pb">
+                {/* Discover Section - Static height or minimal */}
+                {discoverableGames.length > 0 && (
+                    <section className="shrink-0 max-h-[35%] flex flex-col">
+                        <div className="bg-background/95 backdrop-blur-md py-2 z-10 -mx-2 px-2 shrink-0">
+                            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-600 font-[family-name:var(--font-russo)] uppercase tracking-tight">
+                                Discover Games
+                            </h2>
+                            <p className="text-muted-foreground text-xs font-medium opacity-80">Join games that haven't started yet</p>
+                        </div>
 
-                    {loadingDiscoverable ? (
-                        <div className="flex justify-center py-10">
-                            <Loader2 className="animate-spin text-muted-foreground" size={24} />
-                        </div>
-                    ) : discoverableGames.length === 0 ? (
-                        <div className="text-center py-10 glass rounded-xl">
-                            <p className="text-muted-foreground">No joinable games available.</p>
-                        </div>
-                    ) : (
-                        <div className="grid gap-4">
-                            {discoverableGames.map((game) => (
-                                <div key={game.id} className="glass p-5 rounded-xl flex items-center justify-between group hover:scale-[1.01] transition-all">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <h3 className="font-semibold text-lg">{game.name}</h3>
-                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                                <Users size={12} />
-                                                {game.playerCount}/12 players
+                        {loadingDiscoverable ? (
+                            <div className="flex justify-center py-10 shrink-0">
+                                <Loader2 className="animate-spin text-muted-foreground" size={24} />
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3 mt-2 overflow-y-auto custom-scrollbar pr-1 pb-2">
+                                {discoverableGames.map((game) => (
+                                    <div key={game.id} className="glass p-3 rounded-xl flex items-center gap-4 group hover:border-indigo-500/30 transition-all overflow-hidden shrink-0 border border-white/[0.03]">
+                                        <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                            <div className="flex items-center gap-2 mb-1 overflow-hidden">
+                                                <h3 className="font-bold text-base truncate group-hover:text-indigo-400 transition-colors uppercase tracking-tight font-[family-name:var(--font-russo)] leading-none shrink min-w-0">
+                                                    {game.name}
+                                                </h3>
+                                                <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[9px] font-bold border border-indigo-500/20">
+                                                    <Users size={9} />
+                                                    {game.playerCount}/12
+                                                </span>
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground min-w-0">
+                                                <div className="truncate opacity-50 uppercase tracking-widest font-bold">Owner: {game.ownerEmail}</div>
                                             </div>
                                         </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            Owner: {game.ownerEmail}
-                                        </div>
+                                        <button
+                                            onClick={() => handleJoin(game.id)}
+                                            className="shrink-0 relative flex items-center gap-x-2 px-4 py-2 rounded-lg font-bold transition-all hover:scale-[1.03] active:scale-95 group/btn overflow-hidden shadow-lg shadow-indigo-900/40 w-[80px] justify-center"
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-violet-600 group-hover/btn:scale-110 transition-transform" />
+                                            <span className="relative flex items-center gap-1.5 uppercase font-[family-name:var(--font-russo)] text-white text-[10px] tracking-wider">
+                                                <LogIn size={12} /> Join
+                                            </span>
+                                        </button>
                                     </div>
-                                    <Link
-                                        href={`/game/${game.id}`}
-                                        className="ml-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg font-medium flex items-center gap-2 hover:bg-[var(--primary)]/90 transition-all active:scale-95"
-                                    >
-                                        <LogIn size={16} />
-                                        Join
-                                    </Link>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                )}
 
-                {/* My Games Section */}
-                <div className="space-y-4">
-                    <div className="sticky top-0 bg-[var(--background)]/95 backdrop-blur-md py-2 z-10 -mx-2 px-2 flex items-center justify-between">
+                {/* My Games Section - Fills remaining space and scrolls */}
+                <section className="flex-1 min-h-0 flex flex-col gap-4">
+                    <div className="flex items-center justify-between shrink-0">
                         <div>
-                            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                                My Games
-                            </h2>
-                            <p className="text-muted-foreground text-sm">Games you've created or joined</p>
+                            <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-tight font-[family-name:var(--font-russo)] leading-none">My Games</h2>
+                            <p className="text-xs text-muted-foreground mt-1 font-medium opacity-80 uppercase tracking-wider">Games you've created or joined</p>
                         </div>
                         <button
                             onClick={() => setShowHistory(!showHistory)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${showHistory
-                                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-lg shadow-purple-500/10"
-                                : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-transparent"
-                                }`}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider transition-all border border-white/5"
                         >
-                            <Clock size={16} />
-                            {showHistory ? "Showing History" : "Show History"}
+                            <History size={16} />
+                            {showHistory ? 'Hide History' : 'Show History'}
                         </button>
                     </div>
 
-                    {loading ? (
-                        <div className="flex justify-center py-20">
-                            <Loader2 className="animate-spin text-muted-foreground" size={32} />
-                        </div>
-                    ) : (
-                        <div className="grid gap-4">
-                            {games.length === 0 ? (
-                                <div className="text-center py-20 glass rounded-xl">
-                                    <p className="text-muted-foreground">No games found. Start one now!</p>
-                                </div>
-                            ) : (
-                                games.map((g) => {
-                                    const showDelete = canDelete(g);
-                                    const isDeleting = deleting === g.id;
-                                    const status = getGameStatus(g);
-                                    const StatusIcon = status.icon;
+                    <div className="flex-1 min-h-0 flex flex-col glass rounded-xl overflow-hidden border-white/5 shadow-2xl">
+                        {loading ? (
+                            <div className="flex-1 flex items-center justify-center">
+                                <Loader2 className="animate-spin text-muted-foreground" size={32} />
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                {games.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                                        <Trophy size={48} className="mb-4 text-muted-foreground" />
+                                        <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No entries found</p>
+                                    </div>
+                                ) : (
+                                    games.map((g) => {
+                                        const showDelete = canDelete(g);
+                                        const isDeleting = deleting === g.id;
+                                        const status = getGameStatus(g);
+                                        const StatusIcon = status.icon;
+                                        const isCompleted = status.label === 'Completed';
 
-                                    return (
-                                        <div key={g.id} className="glass p-5 rounded-xl flex items-center justify-between group hover:scale-[1.01] transition-all">
-                                            <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <h3 className="font-semibold text-lg">{g.name.replace('ScoreJudge - ', '')}</h3>
-                                                        <div className="flex gap-2">
-                                                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${status.bg} ${status.color} ${status.border || ''}`}>
-                                                                <StatusIcon size={12} />
-                                                                {status.label}
-                                                            </div>
-                                                            {g.isHidden && (
-                                                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
-                                                                    Hidden
+                                        return (
+                                            <div key={g.id} className="group relative glass p-4 rounded-xl flex items-center gap-4 hover:bg-white/[0.07] transition-all border-white/[0.03]">
+                                                <Link href={`/game/${g.id}`} className="min-w-0 flex-1 flex items-center justify-between">
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                                            <h3 className="font-bold text-lg truncate uppercase tracking-tight font-[family-name:var(--font-russo)] leading-none">
+                                                                {g.name.replace('ScoreJudge - ', '')}
+                                                            </h3>
+                                                            <div className="flex gap-1.5 shrink-0">
+                                                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-widest ${status.bg} ${status.color} ${status.border || ''}`}>
+                                                                    <StatusIcon size={10} />
+                                                                    {status.label}
                                                                 </div>
+                                                                {isCompleted && (
+                                                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
+                                                                        <CheckCircle size={10} />
+                                                                    </div>
+                                                                )}
+                                                                {g.isHidden && (
+                                                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-widest">
+                                                                        Hidden
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
+                                                            <span className="text-muted-foreground flex items-center gap-1 opacity-60">
+                                                                <Clock size={10} />
+                                                                {new Date(g.createdTime).toLocaleDateString()}
+                                                            </span>
+                                                            {!isCompleted && status.label !== 'Not Started' && status.label !== 'Loading...' && (
+                                                                <span className="text-indigo-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                                                    Resume <ArrowRight size={10} />
+                                                                </span>
+                                                            )}
+                                                            {isCompleted && (
+                                                                <span className="text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                                                    View Stats <ArrowRight size={10} />
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                                        <span className="flex items-center gap-1">
-                                                            <Clock size={12} />
-                                                            {new Date(g.createdTime).toLocaleDateString()}
-                                                        </span>
-                                                        {status.label !== 'Completed' && status.label !== 'Not Started' && status.label !== 'Loading...' && (
-                                                            <span className="text-indigo-400 font-medium flex items-center gap-1">
-                                                                Resume Game <ArrowRight size={12} />
-                                                            </span>
-                                                        )}
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0">
+                                                        <ChevronRight className="text-muted-foreground" size={20} />
                                                     </div>
-                                                </div>
-                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity mr-4">
-                                                    <ArrowRight className="text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
-                                                </div>
-                                            </Link>
-                                            {showDelete && (
-                                                <button
-                                                    onClick={(e) => handleDelete(g.id, e)}
-                                                    disabled={isDeleting}
-                                                    className="ml-2 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title="Remove from dashboard (it will still be in your history)"
-                                                >
-                                                    {isDeleting ? (
-                                                        <Loader2 className="animate-spin w-5 h-5" />
-                                                    ) : (
-                                                        <Trash2 className="w-5 h-5" />
-                                                    )}
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
+                                                </Link>
+
+                                                {showDelete && (
+                                                    <button
+                                                        onClick={(e) => handleDelete(g.id, e)}
+                                                        disabled={isDeleting}
+                                                        className="shrink-0 p-2.5 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50"
+                                                        title={isCompleted ? "Hide from dashboard" : "Permanently remove or leave game"}
+                                                    >
+                                                        {isDeleting ? (
+                                                            <Loader2 className="animate-spin w-4 h-4" />
+                                                        ) : (
+                                                            <Trash2 className="w-4 h-4" />
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            </main>
         </div>
     );
 }
