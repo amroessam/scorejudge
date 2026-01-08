@@ -85,8 +85,8 @@ export async function GET(
             };
         });
 
-        // Dynamic height: Header (280px) + rows (90px each) + padding (80px)
-        const height = 280 + (playersWithData.length * 90) + 80;
+        // Dynamic height: Header (~260px) + rows (104px each) + footer/padding (~140px)
+        const totalHeight = Math.max(850, 260 + (playersWithData.length * 104) + 140);
 
         return new ImageResponse(
             (
@@ -160,7 +160,7 @@ export async function GET(
 
                         {/* Players list */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '680px' }}>
-                            {playersWithData.slice(0, 5).map((player, i) => (
+                            {playersWithData.map((player, i) => (
                                 <div
                                     key={player.id}
                                     style={{
@@ -259,9 +259,15 @@ export async function GET(
                                         fontWeight: '600',
                                         color: player.isWinner ? '#fef3c7' : '#ffffff',
                                         alignItems: 'center',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '380px',
                                     }}>
-                                        {player.name}
-                                        {player.isLast && !player.isWinner && <span style={{ marginLeft: '8px', fontSize: '20px', opacity: 0.9 }}>🌈</span>}
+                                        <div style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {player.name}
+                                        </div>
+                                        {player.isLast && !player.isWinner && <span style={{ marginLeft: '8px', fontSize: '20px', opacity: 0.9, flexShrink: 0 }}>🌈</span>}
                                     </div>
 
                                     {/* Score */}
@@ -281,7 +287,7 @@ export async function GET(
             ),
             {
                 width: 750,
-                height: Math.max(850, 100 + (Math.min(playersWithData.length, 5) * 125) + 100),
+                height: totalHeight,
             }
         );
 
