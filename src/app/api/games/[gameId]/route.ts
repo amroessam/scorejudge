@@ -3,6 +3,13 @@ import { setGame, getGame, removeGame, updateGame as updateMemoryGame } from "@/
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { getGame as getDbGame, updateGame as updateDbGame, deleteGame as deleteDbGame, hideGameForUser, getUserByEmail, removePlayerFromGame } from "@/lib/db";
+import { DECK_SIZE } from "@/lib/config";
+
+function getFinalRoundNumber(numPlayers: number): number {
+    if (!numPlayers) return 12;
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
+    return maxCards * 2 - 1;
+}
 
 export async function GET(
     req: NextRequest,
@@ -114,34 +121,50 @@ export async function DELETE(
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {
+        console.log(`[DELETE] Game ${gameId}: Starting deletion for user ${token.email}`);
+
         // 1. Get game state
         let game = getGame(gameId) || await getDbGame(gameId);
         if (!game) {
+            console.log(`[DELETE] Game ${gameId}: Not found`);
             return NextResponse.json({ error: "Game not found" }, { status: 404 });
         }
+
+        console.log(`[DELETE] Game ${gameId}: Found. Owner: ${game.ownerEmail}, Players: ${game.players.map(p => p.email).join(', ')}`);
 
         // 2. Get user
         const user = await getUserByEmail(token.email as string);
         if (!user) {
+            console.log(`[DELETE] Game ${gameId}: User ${token.email} not found in database`);
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
+        console.log(`[DELETE] Game ${gameId}: User found. ID: ${user.id}, Email: ${user.email}`);
+
         const isOwner = game.ownerEmail === token.email;
-        const isCompleted = game.rounds.some(r => r.state === 'COMPLETED');
+
+        // Determine if game is actually completed (final round is completed)
+        const finalRoundNumber = getFinalRoundNumber(game.players.length);
+        const isCompleted = game.rounds.some(r => r.state === 'COMPLETED' && r.index >= finalRoundNumber);
+
+        console.log(`[DELETE] Game ${gameId}: isOwner=${isOwner}, isCompleted=${isCompleted}, currentRound=${game.currentRoundIndex}, finalRound=${finalRoundNumber}, totalRounds=${game.rounds.length}`);
 
         if (isCompleted) {
             // Soft delete: Hide for this user but keep data for history/leaderboard
+            console.log(`[DELETE] Game ${gameId}: Soft deleting (hiding) for user ${user.id}`);
             await hideGameForUser(gameId, user.id);
             return NextResponse.json({ success: true, message: "Game hidden from your view" });
         } else {
             // Incomplete game logic
             if (isOwner) {
                 // Hard delete: Remove for everyone if host deletes incomplete game
+                console.log(`[DELETE] Game ${gameId}: Owner hard-deleting game`);
                 await deleteDbGame(gameId);
                 removeGame(gameId); // Clear from memory store
                 return NextResponse.json({ success: true, message: "Game deleted for all players" });
             } else {
                 // Leave game: Remove this player from the game
+                console.log(`[DELETE] Game ${gameId}: Player ${user.id} leaving game`);
                 await removePlayerFromGame(gameId, user.id);
 
                 // Update memory store if game is cached
@@ -159,7 +182,7 @@ export async function DELETE(
             }
         }
     } catch (e: any) {
-        console.error("Error deleting game:", e);
+        console.error(`[DELETE] Game ${gameId}: Error - ${e?.message}`, e);
         return NextResponse.json({
             error: `Failed to process game deletion: ${e?.message || 'Unknown error'}`
         }, { status: 500 });

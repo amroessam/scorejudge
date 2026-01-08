@@ -142,6 +142,7 @@ export async function POST(req: NextRequest) {
         const gameId = dbGame.id;
 
         // 3. Add host as the first player in the database
+        console.log(`[CREATE] Adding creator ${user.email} (ID: ${user.id}) to game ${gameId} as player`);
         await addPlayer(gameId, user.id, 0);
 
         // 3. Initialize game state in memory for immediate access
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
 
         // Cache in memory
         setGame(gameId, initialGameState);
-        console.log(`[API] Created game ${gameId} in Supabase and memory. Owner: ${user.email}`);
+        console.log(`[CREATE] Game ${gameId} created. Owner: ${user.email}, Players: [${user.email}]`);
 
         // 4. Broadcast discovery update
         if ((global as any).broadcastDiscoveryUpdate) {

@@ -118,8 +118,12 @@ describe('/api/games/[gameId] DELETE', () => {
     const { getUserByEmail, hideGameForUser } = require('@/lib/db');
     (getUserByEmail as jest.Mock).mockResolvedValue({ id: 'user1', email: 'player1@test.com' });
 
+    // For 2 players, final round is 11 (24/2 * 2 - 1 = 23, 0-indexed)
     const gameState = createGameState({
-      rounds: [{ index: 1, state: 'COMPLETED', trump: 'H', cards: 5 }]
+      rounds: [
+        { index: 0, state: 'COMPLETED', trump: 'H', cards: 1, bids: {}, tricks: {} },
+        { index: 11, state: 'COMPLETED', trump: 'H', cards: 12, bids: {}, tricks: {} } // Final round
+      ]
     });
     setGame('game1', gameState);
 

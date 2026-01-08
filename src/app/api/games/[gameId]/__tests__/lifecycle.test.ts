@@ -59,11 +59,16 @@ describe('DELETE /api/games/[gameId] Lifecycle', () => {
     });
 
     describe('Completed Game', () => {
+        // For 2 players, final round is index 11 (24/2 * 2 - 1 = 23, 0-indexed = index 11)
         const completedGame = {
             id: gameId,
             ownerEmail: 'host@test.com',
-            players: [{ id: 'host-1' }, { id: 'player-2' }],
-            rounds: [{ state: 'COMPLETED' }]
+            players: [{ id: 'host-1', email: 'host@test.com' }, { id: 'player-2', email: 'player@test.com' }],
+            rounds: [
+                { index: 0, state: 'COMPLETED' },
+                { index: 11, state: 'COMPLETED' } // Final round for 2 players
+            ],
+            currentRoundIndex: 12
         };
 
         it('Host deletes: should soft delete (hide)', async () => {

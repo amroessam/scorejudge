@@ -98,6 +98,7 @@ export function Scoreboard({
     const router = useRouter();
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
     const [isSharing, setIsSharing] = useState(false);
+    const [showLastPlayerMessage, setShowLastPlayerMessage] = useState(true);
     const { players, currentRoundIndex, rounds, firstDealerEmail, name: gameName } = gameState;
     const activeRound = rounds.find((r: any) => r.index === currentRoundIndex);
 
@@ -281,6 +282,16 @@ export function Scoreboard({
         distinctScores.length > 1 &&
         players.find((p: Player) => p.email === currentUserEmail)?.score === bottomScore;
 
+    // Auto-dismiss last player message after 5 seconds
+    useEffect(() => {
+        if (isGameEnded && isLastPlayer && showLastPlayerMessage) {
+            const timer = setTimeout(() => {
+                setShowLastPlayerMessage(false);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [isGameEnded, isLastPlayer, showLastPlayerMessage]);
+
     // --- UX FEATURES LOGIC ---
 
     // 1. Table Mood
@@ -350,16 +361,28 @@ export function Scoreboard({
             )}
 
             {/* Last Player Message */}
-            {isGameEnded && isLastPlayer && (
+            {isGameEnded && isLastPlayer && showLastPlayerMessage && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                     <div className="bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 via-green-500 via-blue-500 via-indigo-500 to-purple-500 p-1 rounded-2xl animate-pulse">
-                        <div className="bg-[var(--card)] rounded-xl p-8 text-center">
+                        <div className="bg-[var(--card)] rounded-xl p-8 text-center relative">
+                            {/* Close button */}
+                            <button
+                                onClick={() => setShowLastPlayerMessage(false)}
+                                className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                                aria-label="Close"
+                            >
+                                ✕
+                            </button>
+
                             <div className="text-8xl mb-4 animate-bounce">🏳️‍🌈</div>
                             <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 via-green-500 via-blue-500 via-indigo-500 to-purple-500 mb-2">
                                 YOU ARE GAY
                             </div>
                             <div className="text-xl text-[var(--muted-foreground)] mt-4">
                                 Better luck next time! 🎮
+                            </div>
+                            <div className="text-sm text-[var(--muted-foreground)] mt-4 opacity-60">
+                                Auto-closing in 5s...
                             </div>
                         </div>
                     </div>
