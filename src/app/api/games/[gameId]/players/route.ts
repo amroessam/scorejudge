@@ -57,22 +57,31 @@ export async function PATCH(
         });
     }
 
-    // Update player in memory
-    const playerIndex = game.players.findIndex((p: Player) => p.email === token.email);
+    // CRITICAL: Refetch game from database to get latest player_order
+    // This ensures that if the host has reordered players, we preserve that order
+    // when broadcasting the profile update
+    const freshGame = await getDbGame(gameId);
+    if (!freshGame) {
+        return NextResponse.json({ error: "Failed to fetch updated game state" }, { status: 500 });
+    }
+
+    // Update the specific player's data in the fresh game state
+    const playerIndex = freshGame.players.findIndex((p: Player) => p.email === token.email);
     if (playerIndex === -1) {
         return NextResponse.json({ error: "Player not found in game" }, { status: 404 });
     }
 
-    if (name) game.players[playerIndex].name = name;
-    if (image) game.players[playerIndex].image = image;
+    // Apply the profile updates to the player
+    if (name) freshGame.players[playerIndex].name = name;
+    if (image) freshGame.players[playerIndex].image = image;
 
-    // Save to store
-    setGame(gameId, game);
+    // Save updated game to memory store
+    setGame(gameId, freshGame);
 
     // Broadcast update
     if ((global as any).broadcastGameUpdate) {
-        (global as any).broadcastGameUpdate(gameId, game);
+        (global as any).broadcastGameUpdate(gameId, freshGame);
     }
 
-    return NextResponse.json({ success: true, game });
+    return NextResponse.json({ success: true, game: freshGame });
 }

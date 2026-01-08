@@ -67,6 +67,10 @@ describe('/api/games/[gameId]/players', () => {
       const gameState = createGameState(0);
       setGame('game1', gameState);
 
+      // Mock getGame from db to return the game state (for refetch)
+      const { getGame: getDbGame } = require('@/lib/db');
+      (getDbGame as jest.Mock).mockResolvedValue(gameState);
+
       const req = new NextRequest('http://localhost:3000/api/games/game1/players', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -185,6 +189,10 @@ describe('/api/games/[gameId]/players', () => {
         email: 'player@test.com',
       });
 
+      // Mock getGame from db to return null (game doesn't exist)
+      const { getGame: getDbGame } = require('@/lib/db');
+      (getDbGame as jest.Mock).mockResolvedValue(null);
+
       const req = new NextRequest('http://localhost:3000/api/games/nonexistent/players', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -207,6 +215,10 @@ describe('/api/games/[gameId]/players', () => {
 
       const gameState = createGameState(0);
       setGame('game1', gameState);
+
+      // Mock getGame from db to return the game state (for refetch)
+      const { getGame: getDbGame } = require('@/lib/db');
+      (getDbGame as jest.Mock).mockResolvedValue(gameState);
 
       const req = new NextRequest('http://localhost:3000/api/games/game1/players', {
         method: 'PATCH',
