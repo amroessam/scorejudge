@@ -39,7 +39,9 @@ export async function GET(req: NextRequest) {
                 name,
                 created_at,
                 current_round_index,
-                game_players!inner(user_id, is_hidden)
+                owner:users!owner_id(email),
+                game_players!inner(user_id, is_hidden),
+                all_players:game_players(count)
             `)
             .eq('game_players.user_id', dbUserId);
 
@@ -60,7 +62,9 @@ export async function GET(req: NextRequest) {
             name: g.name,
             createdTime: g.created_at,
             currentRoundIndex: g.current_round_index,
-            isHidden: (g.game_players as any)?.[0]?.is_hidden || false
+            isHidden: (g.game_players as any)?.[0]?.is_hidden || false,
+            ownerEmail: (g.owner as any)?.email,
+            playerCount: (g.all_players as any)?.[0]?.count || 0
         }));
 
         return NextResponse.json(mapped);

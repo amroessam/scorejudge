@@ -228,6 +228,40 @@ export async function hideGameForUser(gameId: string, userId: string) {
     return true;
 }
 
+// --- Discovery & Stats ---
+
+export async function getDiscoverableGames(userEmail: string) {
+    const { data: games, error } = await supabaseAdmin
+        .from('games')
+        .select(`
+            id,
+            name,
+            created_at,
+            owner:users!owner_id(email),
+            game_players(user:users(email))
+        `)
+        .eq('current_round_index', 0);
+
+    if (error) {
+        console.error('Error fetching discoverable games:', error);
+        return [];
+    }
+
+    return (games || [])
+        .filter(g => {
+            const players = (g.game_players as any[]) || [];
+            const hasJoined = players.some(p => p.user?.email === userEmail);
+            return !hasJoined && players.length < 12;
+        })
+        .map(g => ({
+            id: g.id,
+            name: g.name,
+            ownerEmail: (g.owner as any)?.email,
+            playerCount: (g.game_players as any[])?.length || 0,
+            createdAt: new Date(g.created_at).getTime(),
+        }));
+}
+
 // --- Round Operations ---
 
 export async function saveRound(gameId: string, roundIndex: number, roundData: Partial<Round>) {

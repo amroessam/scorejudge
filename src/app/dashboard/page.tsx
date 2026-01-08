@@ -11,6 +11,9 @@ interface GameFile {
     name: string;
     createdTime: string;
     isHidden?: boolean;
+    ownerEmail: string;
+    playerCount: number;
+    currentRoundIndex: number;
 }
 
 interface GameState {
@@ -94,21 +97,6 @@ export default function Dashboard() {
                             new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime()
                         );
                         setGames(sortedGames);
-
-                        // Fetch game states to check if they've started
-                        data.forEach((game: GameFile) => {
-                            fetch(`/api/games/${game.id}`)
-                                .then((res) => res.json())
-                                .then((gameState: GameState) => {
-                                    setGameStates((prev) => ({
-                                        ...prev,
-                                        [game.id]: gameState,
-                                    }));
-                                })
-                                .catch((err) => {
-                                    console.error(`Failed to fetch state for game ${game.id}:`, err);
-                                });
-                        });
                     }
                     setLoading(false);
                 })
@@ -117,11 +105,14 @@ export default function Dashboard() {
                     setLoading(false);
                 });
         }
-    }, [session, showHistory]);
+    }, [session, showHistory, router]); // Added router to dependencies for safety
 
     // Periodic refresh of discoverable games as fallback for WebSocket failures
     useEffect(() => {
         if (!session) return;
+
+        // Initial fetch
+        fetchDiscoverableGames();
 
         // Refresh discoverable games every 30 seconds as a fallback
         const refreshInterval = setInterval(() => {
@@ -196,51 +187,22 @@ export default function Dashboard() {
                 };
 
                 socket.onerror = (event) => {
-                    // WebSocket error events don't provide detailed information
-                    // Log at debug level instead of error level to avoid console noise
-                    // The onclose handler will provide more useful information
                     if (process.env.NODE_ENV === 'development') {
-                        console.log('[Discovery] WebSocket error event (connection issue, will attempt reconnect):', {
-                            type: event.type,
-                            readyState: event.target instanceof WebSocket ? event.target.readyState : 'unknown',
-                        });
+                        console.log('[Discovery] WebSocket error event (connection issue, will attempt reconnect):', event);
                     }
                 };
 
                 socket.onclose = (event) => {
                     const wasClean = event.wasClean;
                     const code = event.code;
-                    const reason = event.reason || 'No reason provided';
-
-                    // Log closure details
-                    if (wasClean) {
-                        console.log('[Discovery] WebSocket closed cleanly');
-                    } else {
-                        console.log('[Discovery] WebSocket closed unexpectedly', {
-                            code,
-                            reason,
-                        });
-                    }
-
-                    // Don't reconnect for:
-                    // - Clean close (1000)
-                    // - Policy violation (1008) - typically means authentication failure
-                    // - Max reconnection attempts reached
                     const isPolicyViolation = code === 1008;
-                    const shouldReconnect = !wasClean &&
-                        !isPolicyViolation &&
-                        reconnectAttempts < maxReconnectAttempts;
+                    const shouldReconnect = !wasClean && !isPolicyViolation && reconnectAttempts < maxReconnectAttempts;
 
-                    if (isPolicyViolation) {
-                        console.log('[Discovery] Policy violation detected, will not reconnect. Please refresh the page.');
-                    } else if (shouldReconnect) {
+                    if (shouldReconnect) {
                         reconnectAttempts++;
-                        console.log(`[Discovery] Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
                         reconnectTimeout = setTimeout(() => {
                             connect();
                         }, reconnectDelay);
-                    } else if (reconnectAttempts >= maxReconnectAttempts) {
-                        console.log('[Discovery] Max reconnection attempts reached. WebSocket will not reconnect.');
                     }
                 };
             } catch (error) {
@@ -297,30 +259,32 @@ export default function Dashboard() {
         }
     };
 
-    const hasGameStarted = (gameId: string): boolean => {
-        const state = gameStates[gameId];
-        if (!state) return false; // Assume started if we don't know
-        return state.currentRoundIndex > 0 ||
-            (state.rounds !== undefined && state.rounds !== null && state.rounds.some((r: any) => r.state === 'COMPLETED' || r.state === 'PLAYING'));
+    const hasGameStarted = (game: GameFile): boolean => {
+        const state = gameStates[game.id];
+        if (state) {
+            return state.currentRoundIndex > 0 ||
+                (state.rounds !== undefined && state.rounds !== null && state.rounds.some((r: any) => r.state === 'COMPLETED' || r.state === 'PLAYING'));
+        }
+        return game.currentRoundIndex > 0;
     };
 
-    const canDelete = (gameId: string): boolean => {
-        const state = gameStates[gameId];
-        if (!state) return false;
-        // Owner can delete games in any state (not started, in progress, paused, or completed)
-        return state.ownerEmail === session?.user?.email;
+    const canDelete = (game: GameFile): boolean => {
+        const state = gameStates[game.id];
+        if (state) {
+            return state.ownerEmail === session?.user?.email;
+        }
+        return game.ownerEmail === session?.user?.email;
     };
 
-    const getGameStatus = (gameId: string) => {
-        const state = gameStates[gameId];
-        if (!state) return { label: 'Loading...', color: 'text-gray-500', bg: 'bg-gray-500/10', icon: Loader2 };
+    const getGameStatus = (game: GameFile) => {
+        const state = gameStates[game.id];
 
-        const numPlayers = state.players?.length || 0;
+        const numPlayers = state?.players?.length || game.playerCount || 0;
+        const currentRoundIndex = state?.currentRoundIndex ?? game.currentRoundIndex ?? 0;
         const finalRound = getFinalRoundNumber(numPlayers);
 
         // Determine if game is completed
-        // A game is completed if the last round is marked as COMPLETED and its index >= finalRound
-        const completedRounds = state.rounds?.filter(r => r.state === 'COMPLETED') || [];
+        const completedRounds = state?.rounds?.filter(r => r.state === 'COMPLETED') || [];
         const lastCompletedRound = completedRounds.length > 0
             ? Math.max(...completedRounds.map(r => r.index))
             : 0;
@@ -337,9 +301,9 @@ export default function Dashboard() {
             };
         }
 
-        if (state.currentRoundIndex > 0 || (state.rounds && state.rounds.some(r => r.state === 'COMPLETED' || r.state === 'PLAYING'))) {
+        if (currentRoundIndex > 0 || (state?.rounds && state.rounds.some(r => r.state === 'COMPLETED' || r.state === 'PLAYING'))) {
             return {
-                label: `Round ${state.currentRoundIndex} of ${finalRound}`,
+                label: `Round ${currentRoundIndex} of ${finalRound}`,
                 color: 'text-indigo-400',
                 bg: 'bg-indigo-500/10',
                 border: 'border-indigo-500/20',
@@ -495,9 +459,9 @@ export default function Dashboard() {
                                 </div>
                             ) : (
                                 games.map((g) => {
-                                    const showDelete = canDelete(g.id);
+                                    const showDelete = canDelete(g);
                                     const isDeleting = deleting === g.id;
-                                    const status = getGameStatus(g.id);
+                                    const status = getGameStatus(g);
                                     const StatusIcon = status.icon;
 
                                     return (
