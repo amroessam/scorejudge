@@ -26,8 +26,10 @@ import {
     Crown,
     Loader2,
     LogIn,
-    Upload
+    Upload,
+    Home
 } from "lucide-react";
+import Link from "next/link";
 import { Player } from "@/lib/store";
 import { ImageCropperOverlay } from "./ImageCropperOverlay";
 import { getAvatarUrl } from "@/lib/utils";
@@ -385,7 +387,18 @@ export function GameSetup({
             />
 
             {/* Header */}
-            <div className="text-center space-y-2 pt-6 pb-4 px-4 shrink-0 z-10 bg-[var(--background)]">
+            <div className="text-center space-y-2 pt-6 pb-4 px-4 shrink-0 z-10 bg-[var(--background)] relative">
+                {/* Home button */}
+                <div className="absolute top-6 left-4">
+                    <Link
+                        href="/dashboard"
+                        className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
+                        title="Dashboard"
+                    >
+                        <Home size={24} />
+                    </Link>
+                </div>
+
                 <h2 className="text-3xl font-bold tracking-tight">{gameState.name}</h2>
                 <div className="flex items-center justify-center gap-2">
                     <button

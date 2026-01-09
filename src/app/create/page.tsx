@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { Loader2, ArrowRight, Home } from "lucide-react";
 
 export default function CreateGame() {
     const [name, setName] = useState("");
@@ -22,7 +23,7 @@ export default function CreateGame() {
             });
 
             const responseText = await res.text();
-            
+
             if (res.ok) {
                 try {
                     const data = JSON.parse(responseText);
@@ -44,7 +45,18 @@ export default function CreateGame() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--background)] safe-pb">
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--background)] safe-pb relative">
+            {/* Home button */}
+            <div className="absolute top-6 left-6">
+                <Link
+                    href="/dashboard"
+                    className="p-3 bg-[var(--secondary)] text-[var(--foreground)] rounded-full shadow-lg hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                    title="Return to Dashboard"
+                >
+                    <Home size={24} />
+                </Link>
+            </div>
+
             <div className="w-full max-w-sm">
                 <form onSubmit={handleCreate} className="space-y-8">
                     <div className="space-y-2">
@@ -60,7 +72,7 @@ export default function CreateGame() {
                             disabled={creating}
                         />
                     </div>
-                    
+
                     <button
                         disabled={creating || !name}
                         className="w-full bg-[var(--primary)] text-white py-4 rounded-full font-bold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-transform active:scale-95"
