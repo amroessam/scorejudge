@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase';
-import { GameState, Player, Round } from './store';
+import { GameState, Player, Round, removeGame } from './store';
+import { DECK_SIZE } from './config';
 
 // --- User Operations ---
 
@@ -553,4 +554,79 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         });
 
     return leaderboard;
+}
+
+function getFinalRoundNumber(numPlayers: number): number {
+    if (!numPlayers) return 12;
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
+    return maxCards * 2 - 1;
+}
+
+/**
+ * Automatically hard-deletes games that are not completed and are older than 6 hours.
+ * Cleans up both memory store and database.
+ */
+export async function purgeStaleGames() {
+    try {
+        const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
+        // 1. Fetch games older than 6 hours
+        // We fetch id, current_round_index, players (to count), and rounds (to check completion)
+        const { data: games, error } = await supabaseAdmin
+            .from('games')
+            .select(`
+                id,
+                current_round_index,
+                game_players(user_id),
+                rounds(round_index, state)
+            `)
+            .lt('created_at', sixHoursAgo);
+
+        if (error || !games) {
+            if (error) console.error('[Maintenance] Error fetching stale games:', error);
+            return;
+        }
+
+        if (games.length === 0) return;
+
+        console.log(`[Maintenance] Checking ${games.length} stale games for removal...`);
+
+        const toDelete: string[] = [];
+
+        for (const game of games) {
+            const numPlayers = game.game_players?.length || 0;
+            const finalRound = getFinalRoundNumber(numPlayers);
+            const rounds = (game.rounds as any[]) || [];
+
+            // A game is completed if any round with index >= finalRound is COMPLETED
+            const isCompleted = rounds.some(r => r.state === 'COMPLETED' && r.round_index >= finalRound);
+
+            if (!isCompleted) {
+                toDelete.push(game.id);
+            }
+        }
+
+        if (toDelete.length > 0) {
+            console.log(`[Maintenance] Purging ${toDelete.length} incomplete stale games.`);
+
+            // Perform bulk delete from database
+            // Cascading deletes should handle rounds and game_players
+            const { error: delError } = await supabaseAdmin
+                .from('games')
+                .delete()
+                .in('id', toDelete);
+
+            if (delError) {
+                console.error('[Maintenance] Error purging games from DB:', delError);
+            } else {
+                // Clear from memory store as well
+                for (const id of toDelete) {
+                    removeGame(id);
+                }
+                console.log(`[Maintenance] Successfully purged ${toDelete.length} games.`);
+            }
+        }
+    } catch (e) {
+        console.error('[Maintenance] Unexpected error during purge:', e);
+    }
 }

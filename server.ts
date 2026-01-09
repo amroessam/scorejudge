@@ -7,7 +7,7 @@ import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { getGame, type GameState } from './src/lib/store';
-import { getGame as getDbGame } from './src/lib/db';
+import { getGame as getDbGame, purgeStaleGames } from './src/lib/db';
 import { getToken } from 'next-auth/jwt';
 import { IncomingMessage } from 'http';
 import { runMigrations } from './src/lib/db-admin';
@@ -299,5 +299,15 @@ app.prepare().then(async () => {
     server.listen(port, () => {
         const protocol = useHttps ? 'https' : 'http';
         console.log(`> Ready on ${protocol}://${hostname}:${port}`);
+
+        // Set up maintenance interval (run every hour)
+        // This will purge stale incomplete games (lobby/ongoing) older than 6 hours
+        // We run once immediately on startup and then every hour
+        purgeStaleGames().catch(err => console.error('[Maintenance] Initial purge failed:', err));
+
+        setInterval(() => {
+            console.log('[Maintenance] Running scheduled stale game purge...');
+            purgeStaleGames().catch(err => console.error('[Maintenance] Scheduled purge failed:', err));
+        }, 60 * 60 * 1000); // 1 hour
     });
 });
