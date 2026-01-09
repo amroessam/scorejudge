@@ -65,13 +65,19 @@ describe('Dashboard', () => {
       status: 'authenticated',
     });
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    }).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ email: 'test@example.com', name: 'Test User' }),
+      });
 
     render(<Dashboard />);
 
@@ -90,13 +96,19 @@ describe('Dashboard', () => {
       status: 'authenticated',
     });
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    }).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ email: 'test@example.com', name: 'Test User' }),
+      });
 
     render(<Dashboard />);
 

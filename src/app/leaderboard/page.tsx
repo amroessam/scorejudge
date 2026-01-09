@@ -29,6 +29,10 @@ export default function LeaderboardPage() {
     const [isSharing, setIsSharing] = useState(false);
     const [selectedPlayer, setSelectedPlayer] = useState<LeaderboardEntry | null>(null);
 
+    // Pre-fetching state
+    const [prefetchedImage, setPrefetchedImage] = useState<Blob | null>(null);
+    const [isPrefetching, setIsPrefetching] = useState(false);
+
     useEffect(() => {
         fetch("/api/leaderboard")
             .then((res) => res.json())
@@ -45,13 +49,38 @@ export default function LeaderboardPage() {
             });
     }, []);
 
+    // Pre-fetch share image as soon as data is ready
+    useEffect(() => {
+        if (!loading && leaderboard.length > 0 && !prefetchedImage && !isPrefetching) {
+            setIsPrefetching(true);
+            console.log("[Leaderboard] Pre-fetching share image...");
+            fetch("/api/og/leaderboard")
+                .then(res => res.ok ? res.blob() : null)
+                .then(blob => {
+                    if (blob) {
+                        console.log("[Leaderboard] Share image pre-fetched:", blob.size, "bytes");
+                        setPrefetchedImage(blob);
+                    }
+                })
+                .catch(err => console.error("[Leaderboard] Pre-fetch failed:", err))
+                .finally(() => setIsPrefetching(false));
+        }
+    }, [loading, leaderboard, prefetchedImage, isPrefetching]);
+
     const handleShare = async () => {
         setIsSharing(true);
         try {
-            const response = await fetch("/api/og/leaderboard");
-            if (!response.ok) throw new Error("Failed to generate image");
+            let blob = prefetchedImage;
 
-            const blob = await response.blob();
+            if (!blob) {
+                console.log("[Leaderboard] No pre-fetched image, fetching now...");
+                const response = await fetch("/api/og/leaderboard");
+                if (!response.ok) throw new Error("Failed to generate image");
+                blob = await response.blob();
+            } else {
+                console.log("[Leaderboard] Using pre-fetched image");
+            }
+
             const file = new File([blob], "scorejudge-leaderboard.png", { type: "image/png" });
 
             if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -114,14 +143,14 @@ export default function LeaderboardPage() {
                     <button
                         onClick={handleShare}
                         disabled={isSharing || leaderboard.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-full font-medium hover:bg-[var(--primary)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-full font-medium hover:bg-[var(--primary)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md active:scale-95 transition-transform"
                     >
                         {isSharing ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                             <Share2 className="w-4 h-4" />
                         )}
-                        Share
+                        {isSharing ? 'Sharing...' : 'Share'}
                     </button>
                 </div>
             </div>

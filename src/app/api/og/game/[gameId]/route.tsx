@@ -288,6 +288,9 @@ export async function GET(
             {
                 width: 750,
                 height: totalHeight,
+                headers: {
+                    'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=300',
+                },
             }
         );
 

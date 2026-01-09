@@ -70,41 +70,6 @@ describe('GameSetup', () => {
     (global.fetch as jest.Mock).mockClear();
   });
 
-  it('should open cropper when image is selected for upload', async () => {
-    const { container } = render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
-
-    // Hidden file input should be present
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(fileInput).toBeInTheDocument();
-
-    // Simulate file selection with FileReader mock
-    const file = new File(['(⌐□_□)'], 'new_avatar.png', { type: 'image/png' });
-
-    // Mock FileReader that triggers callback synchronously
-    const mockFileReaderInstance = {
-      readAsDataURL: jest.fn(function (this: any) {
-        if (this.onloadend) {
-          this.onloadend();
-        }
-      }),
-      onloadend: null as any,
-      result: 'data:image/png;base64,testimage'
-    };
-    jest.spyOn(window, 'FileReader').mockImplementation(() => mockFileReaderInstance as any);
-
-    Object.defineProperty(fileInput, 'files', {
-      value: [file]
-    });
-
-    await waitFor(async () => {
-      fireEvent.change(fileInput);
-    });
-
-    await waitFor(() => {
-      // Image cropper should open
-      expect(screen.getByText('Crop Photo')).toBeInTheDocument();
-    });
-  });
 
   it('should change dealer when owner clicks OTHER player avatar', () => {
     render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
@@ -129,7 +94,7 @@ describe('GameSetup', () => {
     }
   });
 
-  it('should NOT change dealer when owner clicks OWN avatar (triggers image upload instead)', () => {
+  it('should NOT change dealer when owner clicks OWN avatar', () => {
     render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
 
     const avatar = screen.getByAltText('Player 1');
@@ -146,6 +111,14 @@ describe('GameSetup', () => {
         })
       );
     }
+  });
+
+  it('should not show upload icon on current user avatar', () => {
+    const { container } = render(<GameSetup {...defaultProps} currentUserEmail="p1@test.com" />);
+    // The Upload icon (from lucide-react) would render an svg with specific classes or a data-testid if we had one.
+    // Since we're just checking for the absence of the UI, we can check for the lack of the hover overlay.
+    const uploadOverlay = container.querySelector('.bg-black\\/40');
+    expect(uploadOverlay).not.toBeInTheDocument();
   });
 
   it('should auto-select first player as dealer (no explicit button needed)', () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
     DndContext,
     closestCenter,
@@ -22,16 +22,13 @@ import {
     Share2,
     Check,
     GripVertical,
-    User,
     Crown,
     Loader2,
     LogIn,
-    Upload,
     Home
 } from "lucide-react";
 import Link from "next/link";
 import { Player } from "@/lib/store";
-import { ImageCropperOverlay } from "./ImageCropperOverlay";
 import { getAvatarUrl } from "@/lib/utils";
 
 interface GameSetupProps {
@@ -51,8 +48,6 @@ function SortablePlayerItem({
     isCurrentUser,
     effectiveDealerEmail,
     onToggleDealer,
-    onNameUpdate,
-    onUploadImage,
     isGameStarted,
 }: {
     player: Player,
@@ -60,9 +55,6 @@ function SortablePlayerItem({
     isCurrentUser: boolean,
     effectiveDealerEmail: string,
     onToggleDealer: (email: string) => void,
-    onNameUpdate: (name: string) => void,
-    onDelete: (email: string) => void,
-    onUploadImage: () => void,
     isGameStarted: boolean,
 }) {
     const {
@@ -79,23 +71,6 @@ function SortablePlayerItem({
         transition,
         zIndex: isDragging ? 50 : 'auto',
         opacity: isDragging ? 0.8 : 1,
-    };
-
-    const [isEditing, setIsEditing] = useState(false);
-    const [name, setName] = useState(player.name);
-
-    const handleSaveName = async () => {
-        if (!name.trim() || name === player.name) {
-            setIsEditing(false);
-            return;
-        }
-        try {
-            await onNameUpdate(name);
-            setIsEditing(false);
-        } catch (e) {
-            console.error("Failed to update name", e);
-            setName(player.name); // Revert on error
-        }
     };
 
     const isFirstDealer = effectiveDealerEmail === player.email;
@@ -125,9 +100,7 @@ function SortablePlayerItem({
                 className="relative group cursor-pointer"
                 onClick={(e) => {
                     e.stopPropagation();
-                    if (isCurrentUser) {
-                        onUploadImage();
-                    } else if (isOwner) {
+                    if (isOwner && !isCurrentUser) {
                         onToggleDealer(player.email);
                     }
                 }}
@@ -138,11 +111,6 @@ function SortablePlayerItem({
                         alt={player.name}
                         className={`w-10 h-10 rounded-full object-cover ${isFirstDealer ? 'ring-2 ring-[var(--primary)]' : ''}`}
                     />
-                    {isCurrentUser && (
-                        <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Upload size={16} className="text-white" />
-                        </div>
-                    )}
                 </div>
                 {isFirstDealer && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-md flex items-center justify-center border-2 border-white dark:border-gray-800">
@@ -153,24 +121,11 @@ function SortablePlayerItem({
 
             {/* Name Input / Display */}
             <div className="flex-1 min-w-0">
-                {isEditing ? (
-                    <input
-                        autoFocus
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onBlur={handleSaveName}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                        maxLength={12}
-                        className="w-full bg-transparent border-b border-[var(--primary)] outline-none text-[var(--foreground)] font-medium p-0"
-                    />
-                ) : (
-                    <div
-                        onClick={() => isCurrentUser && !isGameStarted && setIsEditing(true)}
-                        className={`font-medium text-lg truncate ${isCurrentUser && !isGameStarted ? 'cursor-pointer hover:text-[var(--primary)] transition-colors' : ''}`}
-                    >
-                        {player.name} {isCurrentUser && <span className="text-xs text-[var(--muted-foreground)] font-normal">(You)</span>}
-                    </div>
-                )}
+                <div
+                    className={`font-medium text-lg truncate`}
+                >
+                    {player.name} {isCurrentUser && <span className="text-xs text-[var(--muted-foreground)] font-normal">(You)</span>}
+                </div>
 
                 {/* Dealer Status - Only show for current dealer */}
                 {isFirstDealer && (
@@ -195,8 +150,6 @@ export function GameSetup({
     const [copied, setCopied] = useState(false);
     const [starting, setStarting] = useState(false);
     const [joining, setJoining] = useState(false);
-    const [cropperImage, setCropperImage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // DnD Sensors
     const sensors = useSensors(
@@ -233,28 +186,6 @@ export function GameSetup({
                 console.error("Failed to reorder players", e);
             }
         }
-    };
-
-    const handleNameUpdate = async (name: string) => {
-        if (!currentUserEmail) return;
-
-        // Prevent name changes after game has started
-        if (gameState.currentRoundIndex > 0) {
-            return;
-        }
-
-        // Optimistic update
-        const newPlayers = gameState.players.map((p: Player) =>
-            p.email === currentUserEmail ? { ...p, name } : p
-        );
-        onGameUpdate({ ...gameState, players: newPlayers });
-
-        // API Call
-        await fetch(`/api/games/${gameId}/players`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
-        });
     };
 
     const handleToggleDealer = async (email: string) => {
@@ -338,53 +269,11 @@ export function GameSetup({
         }
     };
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        // Reset the input value so the same file can be selected again if needed
-        e.target.value = '';
-
-        // Basic validation
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit for cropping
-            alert("Image is too large. Please choose an image under 10MB.");
-            return;
-        }
-
-        // Read the file and open cropper
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result as string;
-            setCropperImage(base64String);
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleCropComplete = async (croppedImageBase64: string) => {
-        try {
-            await fetch(`/api/games/${gameId}/players`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: croppedImageBase64 })
-            });
-        } catch (err) {
-            console.error("Failed to upload image", err);
-            alert("Failed to update profile picture");
-        }
-    };
-
     const players = gameState.players || [];
     const canStart = players.length >= 3;
 
     return (
         <div className="flex flex-col h-full overflow-hidden bg-[var(--background)]">
-            <input
-                type="file"
-                ref={fileInputRef}
-                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, overflow: 'hidden' }}
-                accept="image/*"
-                onChange={handleFileChange}
-            />
 
             {/* Header */}
             <div className="text-center space-y-2 pt-6 pb-4 px-4 shrink-0 z-10 bg-[var(--background)] relative">
@@ -439,13 +328,6 @@ export function GameSetup({
                                         isCurrentUser={player.email === currentUserEmail}
                                         effectiveDealerEmail={effectiveDealerEmail}
                                         onToggleDealer={handleToggleDealer}
-                                        onNameUpdate={handleNameUpdate}
-                                        onDelete={() => { }}
-                                        onUploadImage={() => {
-                                            if (fileInputRef.current) {
-                                                fileInputRef.current.click();
-                                            }
-                                        }}
                                         isGameStarted={gameState.currentRoundIndex > 0}
                                     />
                                 );
@@ -492,12 +374,6 @@ export function GameSetup({
                 </div>
             </div>
 
-            <ImageCropperOverlay
-                isOpen={!!cropperImage}
-                imageSrc={cropperImage || ''}
-                onClose={() => setCropperImage(null)}
-                onCropComplete={handleCropComplete}
-            />
         </div>
     );
 }
