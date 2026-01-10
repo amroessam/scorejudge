@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
     Settings,
     Plus,
@@ -18,7 +18,9 @@ import {
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
+import { PredictionHint } from "./PredictionHint";
 import { DECK_SIZE } from "@/lib/config";
+import { calculatePredictions } from "@/lib/predictions";
 import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "framer-motion";
 import { getAvatarUrl } from "@/lib/utils";
@@ -147,6 +149,19 @@ export function Scoreboard({
         ? Math.max(...completedRounds.map((r: any) => r.index))
         : 0;
     const isGameEnded = lastCompletedRound >= finalRoundNumber;
+    const isFinalRound = currentRoundIndex >= finalRoundNumber;
+
+    // Calculate predictions for current user
+    const predictionHints = useMemo(() => {
+        if (!currentUserEmail || isGameEnded || !activeRound) return null;
+        return calculatePredictions(
+            currentUserEmail,
+            players,
+            activeRound.cards,
+            players.length,
+            isFinalRound
+        );
+    }, [currentUserEmail, players, activeRound, isGameEnded, isFinalRound]);
 
     // Pre-fetch share image when game ends to enable instant sharing
     const [shareImageBlob, setShareImageBlob] = useState<Blob | null>(null);
@@ -583,10 +598,16 @@ export function Scoreboard({
                                     </div>
                                 </div>
 
-                                {/* Total Score with Floating Animation */}
+                                {/* Total Score with Floating Animation + Prediction Hint */}
                                 <div className="relative shrink-0 flex flex-col items-end">
-                                    <div className="text-3xl font-bold tracking-tight font-mono">
-                                        {player.score}
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-3xl font-bold tracking-tight font-mono">
+                                            {player.score}
+                                        </div>
+                                        {/* Prediction Hint - only for current user */}
+                                        {isMe && predictionHints && predictionHints.show && !isGameEnded && (
+                                            <PredictionHint hints={predictionHints} />
+                                        )}
                                     </div>
                                     <AnimatePresence>
                                         {scoreDiffs[player.email] && (
