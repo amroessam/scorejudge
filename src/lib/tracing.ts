@@ -18,6 +18,13 @@ export function initTracing() {
         return;
     }
 
+    // Only active if endpoint is provided OR in development
+    const isActive = !!process.env.OTEL_EXPORTER_OTLP_ENDPOINT || (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV);
+    if (!isActive) {
+        console.log('[Tracing] OpenTelemetry SDK disabled (no endpoint configured)');
+        return;
+    }
+
     const exporter = new OTLPTraceExporter({
         url: `${OTEL_EXPORTER_ENDPOINT}/v1/traces`,
     });
