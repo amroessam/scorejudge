@@ -157,6 +157,7 @@ export function Scoreboard({
         return calculatePredictions(
             currentUserEmail,
             players,
+            currentRoundIndex,
             activeRound.cards,
             players.length,
             isFinalRound

@@ -11,6 +11,8 @@ import {
     saveRoundTricks,
     updateGame as updateDbGame
 } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
+import { withSpan, extractTraceContext } from "@/lib/tracing";
 
 // Helper to calc round plan
 function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
@@ -72,203 +74,372 @@ export async function POST(
     const token = await getAuthToken(req);
 
     if (!token) {
+        const log = createLogger({ gameId });
+        log.error('Unauthorized round update attempt');
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
     const { action, inputs, targetRoundIndex } = body;
 
-    let game = getGame(gameId) || await getDbGame(gameId);
-    if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    return withSpan(
+        `POST /api/games/{gameId}/rounds - ${action}`,
+        extractTraceContext(token.email as string, token.id as string, gameId),
+        async (span) => {
+            span.setAttribute('http.method', 'POST');
+            span.setAttribute('http.route', '/api/games/{gameId}/rounds');
+            span.setAttribute('game.id', gameId);
+            span.setAttribute('round.action', action);
 
-    const isOwnerOrOperator = game.ownerEmail === token.email || game.operatorEmail === token.email;
-    if (!isOwnerOrOperator) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+            const log = createLogger({
+                userId: token.id as string,
+                userEmail: token.email as string,
+                gameId,
+                action
+            });
 
-    try {
-        if (action === 'START') {
-            if (game.players.length < 3) {
-                return NextResponse.json({ error: "Minimum 3 players required" }, { status: 400 });
+            log.info({ action, targetRoundIndex }, 'Processing round action');
+
+            let game = getGame(gameId) || await getDbGame(gameId);
+            if (!game) {
+                log.error('Game not found');
+                return NextResponse.json({ error: "Game not found" }, { status: 404 });
             }
 
-            if (game.rounds.length === 0) {
-                const plan = getRoundPlan(game.players.length);
-                const rounds: Round[] = plan.map((p, i) => ({
-                    index: i + 1,
-                    cards: p.cards,
-                    trump: p.trump,
-                    state: 'BIDDING',
-                    bids: {},
-                    tricks: {}
-                }));
+            span.setAttribute('game.name', game.name);
+            span.setAttribute('game.currentRound', game.currentRoundIndex);
+            span.setAttribute('game.playerCount', game.players.length);
 
-                await initializeRounds(gameId, rounds, game.players);
-                game.rounds = rounds;
-                game.currentRoundIndex = 1;
-                await updateDbGame(gameId, { currentRoundIndex: 1 });
-            } else if (game.currentRoundIndex === 0) {
-                game.currentRoundIndex = 1;
-                await updateDbGame(gameId, { currentRoundIndex: 1 });
-            }
-        } else if (action === 'BIDS') {
-            const round = game.rounds.find(r => r.index === game.currentRoundIndex);
-            if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
-
-            const validatedBids: Record<string, number> = {};
-            for (const p of game.players) {
-                const bid = inputs[p.email];
-                if (bid === undefined) return NextResponse.json({ error: `Missing bid for ${p.name}` }, { status: 400 });
-                validatedBids[p.email] = Number(bid);
+            const isOwnerOrOperator = game.ownerEmail === token.email || game.operatorEmail === token.email;
+            if (!isOwnerOrOperator) {
+                log.warn({ ownerEmail: game.ownerEmail, operatorEmail: game.operatorEmail }, 'Forbidden: User is not owner or operator');
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
 
-            // Dealer constraint check (simplified here, but should match previous logic)
-            const sumBids = Object.values(validatedBids).reduce((a, b) => a + b, 0);
-            if (sumBids === round.cards) {
-                return NextResponse.json({ error: "Dealer constraint violated" }, { status: 400 });
-            }
+            try {
+                if (action === 'START') {
+                    log.info({ playerCount: game.players.length }, 'Starting game');
 
-            await saveRoundBids(gameId, round.index, validatedBids, game.players, round.cards, round.trump);
-            round.bids = validatedBids;
-            round.state = 'PLAYING';
-        } else if (action === 'TRICKS') {
-            const round = game.rounds.find(r => r.index === game.currentRoundIndex);
-            if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
-
-            const validatedTricks: Record<string, number> = {};
-            const points: Record<string, number> = {};
-            const cardsPerPlayer = round.cards;
-
-            // 1. Validation: for zero-bidders, at most cardsPerPlayer can miss
-            const zeroBidders = game.players.filter((p: Player) => round.bids[p.email] === 0);
-            const missedZeroBidders = zeroBidders.filter((p: Player) => inputs[p.email] === -1);
-            if (missedZeroBidders.length > round.cards) {
-                return NextResponse.json({
-                    error: `Invalid input: at most ${round.cards} player(s) can miss when they bid 0 in this round.`
-                }, { status: 400 });
-            }
-
-            for (const p of game.players) {
-                const trick = inputs[p.email];
-                if (trick === undefined || trick === null || trick === '') {
-                    return NextResponse.json({ error: `Missing tricks for ${p.name}` }, { status: 400 });
-                }
-                const numTrick = Number(trick);
-                validatedTricks[p.email] = numTrick;
-
-                const bid = round.bids[p.email];
-                if (bid === numTrick && numTrick !== -1) {
-                    const roundPoints = bid + cardsPerPlayer;
-                    points[p.email] = roundPoints;
-                    p.score += roundPoints;
-                } else {
-                    points[p.email] = 0;
-                }
-            }
-
-            // Deep validation for missed players
-            const missedPlayers = game.players
-                .filter((p: Player) => validatedTricks[p.email] === -1)
-                .map((p: Player) => ({ email: p.email, bid: round.bids[p.email] ?? 0 }));
-
-            const sumMadeBids = Object.entries(validatedTricks).reduce((sum, [email, tricks]) => {
-                const bid = round.bids[email];
-                if (bid !== undefined && tricks !== -1 && tricks === bid) {
-                    return sum + tricks;
-                }
-                return sum;
-            }, 0);
-
-            const remainingTricks = cardsPerPlayer - sumMadeBids;
-
-            if (!isDistributionPossible(remainingTricks, missedPlayers)) {
-                if (missedPlayers.length === 0) {
-                    return NextResponse.json({
-                        error: `Invalid: All tricks (${cardsPerPlayer}) must be accounted for. Current sum is ${sumMadeBids}.`
-                    }, { status: 400 });
-                }
-                return NextResponse.json({
-                    error: `Invalid distribution: The remaining ${remainingTricks} trick(s) cannot be split among missed players without someone hitting their bid.`
-                }, { status: 400 });
-            }
-
-            await saveRoundTricks(gameId, round.index, validatedTricks, points, game.players);
-            round.tricks = validatedTricks;
-            round.state = 'COMPLETED';
-
-            const finalRound = getFinalRoundNumber(game.players.length);
-            if (game.currentRoundIndex < finalRound) {
-                game.currentRoundIndex += 1;
-                await updateDbGame(gameId, { currentRoundIndex: game.currentRoundIndex });
-            }
-        } else if (action === 'UNDO') {
-            const targetIdx = targetRoundIndex || game.currentRoundIndex;
-            const round = game.rounds.find(r => r.index === targetIdx);
-
-            if (!round) {
-                return NextResponse.json({ error: "Round not found" }, { status: 404 });
-            }
-
-            console.log(`[Rounds API] Undoing round ${targetIdx}. Current state: ${round.state}`);
-            const initialState = round.state;
-
-            if (initialState === 'PLAYING') {
-                // Revert from PLAYING back to BIDDING
-                round.state = 'BIDDING';
-                round.bids = {};
-                round.tricks = {};
-
-                // Update DB: Set round state to BIDDING
-                await supabaseAdmin
-                    .from('rounds')
-                    .update({ state: 'BIDDING' })
-                    .eq('game_id', gameId)
-                    .eq('round_index', targetIdx);
-            } else if (initialState === 'COMPLETED') {
-                // Revert from COMPLETED back to PLAYING
-                // 1. Revert scores for all players in this round
-                for (const p of game.players) {
-                    const bid = round.bids[p.email];
-                    const tricks = round.tricks[p.email];
-                    if (bid !== undefined && tricks !== undefined && tricks !== -1 && bid === tricks) {
-                        const pointsToRemove = bid + round.cards;
-                        p.score = Math.max(0, p.score - pointsToRemove);
+                    if (game.players.length < 3) {
+                        log.error({ playerCount: game.players.length }, 'Insufficient players to start game');
+                        return NextResponse.json({ error: "Minimum 3 players required" }, { status: 400 });
                     }
 
-                    // Update game_players score in DB
-                    await supabaseAdmin
-                        .from('game_players')
-                        .update({ score: p.score })
-                        .eq('game_id', gameId)
-                        .eq('user_id', p.id);
+                    if (game.rounds.length === 0) {
+                        const plan = getRoundPlan(game.players.length);
+                        const rounds: Round[] = plan.map((p, i) => ({
+                            index: i + 1,
+                            cards: p.cards,
+                            trump: p.trump,
+                            state: 'BIDDING',
+                            bids: {},
+                            tricks: {}
+                        }));
+
+                        log.info({ totalRounds: rounds.length, playerCount: game.players.length }, 'Initializing rounds');
+                        await initializeRounds(gameId, rounds, game.players);
+                        game.rounds = rounds;
+                        game.currentRoundIndex = 1;
+                        await updateDbGame(gameId, { currentRoundIndex: 1 });
+                        log.info({ roundsCreated: rounds.length }, 'Game started successfully');
+                    } else if (game.currentRoundIndex === 0) {
+                        game.currentRoundIndex = 1;
+                        await updateDbGame(gameId, { currentRoundIndex: 1 });
+                        log.info('Game resumed from round 1');
+                    }
+
+                    span.setAttribute('round.totalRounds', game.rounds.length);
+
+                } else if (action === 'BIDS') {
+                    const round = game.rounds.find(r => r.index === game.currentRoundIndex);
+                    if (!round) {
+                        log.error({ currentRoundIndex: game.currentRoundIndex }, 'Round not found');
+                        return NextResponse.json({ error: "Round not found" }, { status: 404 });
+                    }
+
+                    span.setAttribute('round.index', round.index);
+                    span.setAttribute('round.cards', round.cards);
+                    span.setAttribute('round.trump', round.trump);
+
+                    log.info({
+                        roundIndex: round.index,
+                        cards: round.cards,
+                        trump: round.trump,
+                        inputs
+                    }, 'Submitting bids');
+
+                    const validatedBids: Record<string, number> = {};
+                    for (const p of game.players) {
+                        const bid = inputs[p.email];
+                        if (bid === undefined) {
+                            log.error({ playerEmail: p.email, playerName: p.name }, 'Missing bid for player');
+                            return NextResponse.json({ error: `Missing bid for ${p.name}` }, { status: 400 });
+                        }
+                        validatedBids[p.email] = Number(bid);
+                    }
+
+                    // Dealer constraint check
+                    const sumBids = Object.values(validatedBids).reduce((a, b) => a + b, 0);
+                    log.info({ sumBids, cards: round.cards, bids: validatedBids }, 'Validating dealer constraint');
+
+                    if (sumBids === round.cards) {
+                        log.warn({ sumBids, cards: round.cards }, 'Dealer constraint violated');
+                        return NextResponse.json({ error: "Dealer constraint violated" }, { status: 400 });
+                    }
+
+                    await saveRoundBids(gameId, round.index, validatedBids, game.players, round.cards, round.trump);
+                    round.bids = validatedBids;
+                    round.state = 'PLAYING';
+                    log.info({ bids: validatedBids }, 'Bids saved successfully');
+
+                } else if (action === 'TRICKS') {
+                    const round = game.rounds.find(r => r.index === game.currentRoundIndex);
+                    if (!round) {
+                        log.error({ currentRoundIndex: game.currentRoundIndex }, 'Round not found');
+                        return NextResponse.json({ error: "Round not found" }, { status: 404 });
+                    }
+
+                    span.setAttribute('round.index', round.index);
+                    span.setAttribute('round.cards', round.cards);
+
+                    log.info({
+                        roundIndex: round.index,
+                        cards: round.cards,
+                        bids: round.bids,
+                        inputs
+                    }, 'Submitting tricks');
+
+                    const validatedTricks: Record<string, number> = {};
+                    const points: Record<string, number> = {};
+                    const cardsPerPlayer = round.cards;
+
+                    // 1. Validation: for zero-bidders, at most cardsPerPlayer can miss
+                    const zeroBidders = game.players.filter((p: Player) => round.bids[p.email] === 0);
+                    const missedZeroBidders = zeroBidders.filter((p: Player) => inputs[p.email] === -1);
+
+                    log.info({
+                        zeroBiddersCount: zeroBidders.length,
+                        missedZeroBiddersCount: missedZeroBidders.length,
+                        maxAllowedMissed: round.cards
+                    }, 'Validating zero-bidder constraints');
+
+                    if (missedZeroBidders.length > round.cards) {
+                        log.error({
+                            missedCount: missedZeroBidders.length,
+                            maxAllowed: round.cards
+                        }, 'Too many zero-bidders marked as missed');
+                        return NextResponse.json({
+                            error: `Invalid input: at most ${round.cards} player(s) can miss when they bid 0 in this round.`
+                        }, { status: 400 });
+                    }
+
+                    for (const p of game.players) {
+                        const trick = inputs[p.email];
+                        if (trick === undefined || trick === null || trick === '') {
+                            log.error({ playerEmail: p.email, playerName: p.name }, 'Missing tricks for player');
+                            return NextResponse.json({ error: `Missing tricks for ${p.name}` }, { status: 400 });
+                        }
+                        const numTrick = Number(trick);
+                        validatedTricks[p.email] = numTrick;
+
+                        const bid = round.bids[p.email];
+                        if (bid === numTrick && numTrick !== -1) {
+                            const roundPoints = bid + cardsPerPlayer;
+                            points[p.email] = roundPoints;
+                            p.score += roundPoints;
+                            log.info({
+                                playerEmail: p.email,
+                                bid,
+                                tricks: numTrick,
+                                pointsEarned: roundPoints,
+                                newScore: p.score
+                            }, 'Player made their bid');
+                        } else {
+                            points[p.email] = 0;
+                            if (numTrick !== -1) {
+                                log.info({
+                                    playerEmail: p.email,
+                                    bid,
+                                    tricks: numTrick
+                                }, 'Player missed their bid');
+                            }
+                        }
+                    }
+
+                    // Deep validation for missed players
+                    const missedPlayers = game.players
+                        .filter((p: Player) => validatedTricks[p.email] === -1)
+                        .map((p: Player) => ({ email: p.email, bid: round.bids[p.email] ?? 0 }));
+
+                    const sumMadeBids = Object.entries(validatedTricks).reduce((sum, [email, tricks]) => {
+                        const bid = round.bids[email];
+                        if (bid !== undefined && tricks !== -1 && tricks === bid) {
+                            return sum + tricks;
+                        }
+                        return sum;
+                    }, 0);
+
+                    const remainingTricks = cardsPerPlayer - sumMadeBids;
+
+                    log.info({
+                        sumMadeBids,
+                        remainingTricks,
+                        missedPlayersCount: missedPlayers.length,
+                        missedPlayers
+                    }, 'Validating trick distribution');
+
+                    if (!isDistributionPossible(remainingTricks, missedPlayers)) {
+                        if (missedPlayers.length === 0) {
+                            log.error({
+                                cardsPerPlayer,
+                                sumMadeBids
+                            }, 'Invalid: All tricks must be accounted for');
+                            return NextResponse.json({
+                                error: `Invalid: All tricks (${cardsPerPlayer}) must be accounted for. Current sum is ${sumMadeBids}.`
+                            }, { status: 400 });
+                        }
+                        log.error({
+                            remainingTricks,
+                            missedPlayers
+                        }, 'Invalid distribution: Cannot split remaining tricks');
+                        return NextResponse.json({
+                            error: `Invalid distribution: The remaining ${remainingTricks} trick(s) cannot be split among missed players without someone hitting their bid.`
+                        }, { status: 400 });
+                    }
+
+                    await saveRoundTricks(gameId, round.index, validatedTricks, points, game.players);
+                    round.tricks = validatedTricks;
+                    round.state = 'COMPLETED';
+
+                    const finalRound = getFinalRoundNumber(game.players.length);
+                    const isGameComplete = game.currentRoundIndex >= finalRound;
+
+                    log.info({
+                        tricks: validatedTricks,
+                        points,
+                        currentRound: game.currentRoundIndex,
+                        finalRound,
+                        isGameComplete
+                    }, 'Tricks saved successfully');
+
+                    if (game.currentRoundIndex < finalRound) {
+                        game.currentRoundIndex += 1;
+                        await updateDbGame(gameId, { currentRoundIndex: game.currentRoundIndex });
+                        log.info({ newRoundIndex: game.currentRoundIndex }, 'Advanced to next round');
+                    } else {
+                        log.info({
+                            finalScores: game.players.map(p => ({
+                                name: p.name,
+                                email: p.email,
+                                score: p.score
+                            }))
+                        }, 'Game completed');
+                    }
+
+                    span.setAttribute('round.isGameComplete', isGameComplete);
+
+                } else if (action === 'UNDO') {
+                    const targetIdx = targetRoundIndex || game.currentRoundIndex;
+                    const round = game.rounds.find(r => r.index === targetIdx);
+
+                    if (!round) {
+                        log.error({ targetRoundIndex: targetIdx }, 'Round not found for undo');
+                        return NextResponse.json({ error: "Round not found" }, { status: 404 });
+                    }
+
+                    log.info({
+                        targetRoundIndex: targetIdx,
+                        currentState: round.state
+                    }, 'Undoing round');
+
+                    const initialState = round.state;
+
+                    if (initialState === 'PLAYING') {
+                        // Revert from PLAYING back to BIDDING
+                        round.state = 'BIDDING';
+                        round.bids = {};
+                        round.tricks = {};
+
+                        await supabaseAdmin
+                            .from('rounds')
+                            .update({ state: 'BIDDING' })
+                            .eq('game_id', gameId)
+                            .eq('round_index', targetIdx);
+
+                        log.info({ roundIndex: targetIdx }, 'Reverted round from PLAYING to BIDDING');
+
+                    } else if (initialState === 'COMPLETED') {
+                        // Revert from COMPLETED back to PLAYING
+                        const scoreChanges: any[] = [];
+
+                        for (const p of game.players) {
+                            const bid = round.bids[p.email];
+                            const tricks = round.tricks[p.email];
+                            if (bid !== undefined && tricks !== undefined && tricks !== -1 && bid === tricks) {
+                                const pointsToRemove = bid + round.cards;
+                                const oldScore = p.score;
+                                p.score = Math.max(0, p.score - pointsToRemove);
+                                scoreChanges.push({
+                                    playerEmail: p.email,
+                                    oldScore,
+                                    newScore: p.score,
+                                    pointsRemoved: pointsToRemove
+                                });
+                            }
+
+                            await supabaseAdmin
+                                .from('game_players')
+                                .update({ score: p.score })
+                                .eq('game_id', gameId)
+                                .eq('user_id', p.id);
+                        }
+
+                        round.state = 'PLAYING';
+                        round.tricks = {};
+
+                        await supabaseAdmin
+                            .from('rounds')
+                            .update({ state: 'PLAYING' })
+                            .eq('game_id', gameId)
+                            .eq('round_index', targetIdx);
+
+                        if (game.currentRoundIndex > targetIdx) {
+                            game.currentRoundIndex = targetIdx;
+                            await updateDbGame(gameId, { currentRoundIndex: targetIdx });
+                        }
+
+                        log.info({
+                            roundIndex: targetIdx,
+                            scoreChanges,
+                            newCurrentRound: game.currentRoundIndex
+                        }, 'Reverted round from COMPLETED to PLAYING');
+                    }
+
+                    span.setAttribute('round.undoFrom', initialState);
                 }
 
-                // 2. Set round state back to PLAYING
-                round.state = 'PLAYING';
-                round.tricks = {};
-
-                await supabaseAdmin
-                    .from('rounds')
-                    .update({ state: 'PLAYING' })
-                    .eq('game_id', gameId)
-                    .eq('round_index', targetIdx);
-
-                // 3. Move currentRoundIndex back to this round if it was advanced
-                if (game.currentRoundIndex > targetIdx) {
-                    game.currentRoundIndex = targetIdx;
-                    await updateDbGame(gameId, { currentRoundIndex: targetIdx });
+                setGame(gameId, game);
+                if ((global as any).broadcastGameUpdate) {
+                    (global as any).broadcastGameUpdate(gameId, game);
                 }
+
+                log.info({
+                    action,
+                    currentRoundIndex: game.currentRoundIndex,
+                    success: true
+                }, 'Round action completed successfully');
+
+                return NextResponse.json({ success: true, game });
+            } catch (e: any) {
+                log.error({
+                    error: e.message,
+                    stack: e.stack,
+                    action,
+                    inputs
+                }, 'Round update error');
+                span.setAttribute('error', true);
+                return NextResponse.json({ error: e.message || "Failed to update round" }, { status: 500 });
             }
         }
-
-        setGame(gameId, game);
-        if ((global as any).broadcastGameUpdate) {
-            (global as any).broadcastGameUpdate(gameId, game);
-        }
-
-        return NextResponse.json({ success: true, game });
-    } catch (e: any) {
-        console.error("Round update error:", e);
-        return NextResponse.json({ error: e.message || "Failed to update round" }, { status: 500 });
-    }
+    );
 }

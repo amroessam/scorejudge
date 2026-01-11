@@ -93,7 +93,7 @@ export function PredictionHint({ hints }: PredictionHintProps) {
                             {/* Hints Content */}
                             <div className="p-2 space-y-1.5">
                                 {/* Position & Ties */}
-                                {hints.tiedWith.length > 0 && (
+                                {hints.tiedWith.length > 0 && !hints.isEliminated && (
                                     <HintRow
                                         icon={<span className="text-sm">🤝</span>}
                                         color="text-purple-400"
@@ -104,8 +104,19 @@ export function PredictionHint({ hints }: PredictionHintProps) {
                                     </HintRow>
                                 )}
 
+                                {/* Elimination Special Message */}
+                                {hints.isEliminated && (
+                                    <HintRow
+                                        icon={<span className="text-sm">🏳️‍🌈</span>}
+                                        color="text-pink-400"
+                                        bgColor="bg-pink-500/10"
+                                    >
+                                        Bid anything you are gay
+                                    </HintRow>
+                                )}
+
                                 {/* Win Condition */}
-                                {hints.winCondition && (
+                                {hints.winCondition && !hints.isEliminated && (
                                     <HintRow
                                         icon={<Trophy size={12} />}
                                         color="text-yellow-400"
@@ -116,7 +127,7 @@ export function PredictionHint({ hints }: PredictionHintProps) {
                                 )}
 
                                 {/* Catch Up (Offensive) */}
-                                {hints.catchUp && (
+                                {hints.catchUp && !hints.isEliminated && (
                                     <HintRow
                                         icon={<Target size={12} />}
                                         color="text-blue-400"
@@ -136,7 +147,7 @@ export function PredictionHint({ hints }: PredictionHintProps) {
                                             </>
                                         ) : (
                                             <>
-                                                To pass {hints.catchUp.targetName} (if they miss!): {formatBidHint(hints.catchUp.minBid)}
+                                                Pass {hints.catchUp.targetName} (if they miss!): {formatBidHint(hints.catchUp.minBid)}
                                             </>
                                         )}
                                     </HintRow>

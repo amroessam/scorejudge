@@ -1,3 +1,6 @@
+// Initialize APM FIRST - before any other imports
+const apm = require('./apm');
+
 import 'dotenv/config';
 import { createServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
@@ -11,6 +14,11 @@ import { getGame as getDbGame, purgeStaleGames } from './src/lib/db';
 import { getToken } from 'next-auth/jwt';
 import { IncomingMessage } from 'http';
 import { runMigrations } from './src/lib/db-admin';
+import { initTracing, createSpan, extractTraceContext } from './src/lib/tracing';
+import { SpanKind } from '@opentelemetry/api';
+
+// Initialize OpenTelemetry tracing
+initTracing();
 
 // We need a way to share state between Next.js API routes and this custom server process.
 // Since they run in the same process in dev/prod (usually), the `store.ts` *should* be shared memory.
@@ -184,8 +192,14 @@ app.prepare().then(async () => {
                 return;
             }
 
+            const span = createSpan('WebSocket Discovery Connect', extractTraceContext(authResult.email), SpanKind.SERVER);
+            span.setAttribute('ws.channel', 'discovery');
+            span.setAttribute('user.email', authResult.email!);
+
             console.log(`Discovery client connected (user: ${authResult.email})`);
             discoveryClients.add(ws);
+
+            span.end();
 
             ws.on('close', () => {
                 discoveryClients.delete(ws);
@@ -211,6 +225,11 @@ app.prepare().then(async () => {
             return;
         }
 
+        const span = createSpan('WebSocket Game Connect', extractTraceContext(authResult.email, undefined, gameId), SpanKind.SERVER);
+        span.setAttribute('ws.channel', 'game');
+        span.setAttribute('game.id', gameId);
+        span.setAttribute('user.email', authResult.email!);
+
         console.log(`Client connected to game ${gameId} (user: ${authResult.email})`);
 
         clients.set(ws, { gameId, email: authResult.email! });
@@ -219,10 +238,15 @@ app.prepare().then(async () => {
         const state = await findGame(gameId);
 
         if (state) {
+            span.setAttribute('game.found', true);
+            span.setAttribute('game.name', state.name);
             ws.send(JSON.stringify({ type: 'GAME_UPDATE', state }));
         } else {
+            span.setAttribute('game.found', false);
             ws.send(JSON.stringify({ type: 'ERROR', message: 'Game not loaded in memory. Visit page to load.' }));
         }
+
+        span.end();
 
         ws.on('message', (message) => {
             console.log('Received:', message.toString());

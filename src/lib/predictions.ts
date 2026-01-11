@@ -25,6 +25,7 @@ export interface PredictionHints {
     show: boolean; // False if all scores are 0
     position: number; // Current rank (1 = first)
     tiedWith: string[]; // Names of players with same score
+    isEliminated: boolean; // True if player cannot win or move up significantly
 
     // Offensive hints - to catch up to player(s) above
     catchUp?: CatchUpHint;
@@ -37,32 +38,74 @@ export interface PredictionHints {
 }
 
 /**
+ * Helper to calculate final round number
+ */
+function getFinalRoundNumber(numPlayers: number): number {
+    const maxCards = Math.floor(52 / numPlayers);
+    return maxCards * 2 - 1;
+}
+
+/**
+ * Helper to get cards for a specific round index
+ */
+function getCardsForRound(roundIndex: number, numPlayers: number): number {
+    const maxCards = Math.floor(52 / numPlayers);
+    if (roundIndex <= maxCards) {
+        // Round 1-10 (for 5 players): 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
+        return maxCards - (roundIndex - 1);
+    } else {
+        // Round 11-19 (for 5 players): 2, 3, 4, 5, 6, 7, 8, 9, 10
+        return (roundIndex - maxCards) + 1;
+    }
+}
+
+/**
+ * Calculate total potential points remaining in the game
+ */
+function getTotalRemainingPotential(currentRoundIndex: number, numPlayers: number): number {
+    const finalRound = getFinalRoundNumber(numPlayers);
+    let total = 0;
+    for (let i = currentRoundIndex; i <= finalRound; i++) {
+        const cards = getCardsForRound(i, numPlayers);
+        // Max points per round: bid full amount + bonus (cards) = cards + cards = 2 * cards
+        total += (2 * cards);
+    }
+    return total;
+}
+
+/**
  * Calculate strategic predictions for a player
  * 
- * Scoring formula: If tricksTaken === bid, points = bid + totalCardsDealt, else 0
- * totalCardsDealt = cardsPerPlayer * numPlayers
+ * Scoring logic:
+ * - If bid made: points = bid + cardsInRound
+ * - If bid missed: points = 0
  */
 export function calculatePredictions(
     currentPlayerEmail: string,
     players: Player[],
-    cardsPerPlayer: number,
+    currentRoundIndex: number,
+    cardsInRound: number,
     numPlayers: number,
     isFinalRound: boolean
 ): PredictionHints {
-    const totalCardsDealt = cardsPerPlayer * numPlayers;
-    const maxBid = cardsPerPlayer; // Can't bid more than cards dealt to you
-    const maxPossibleScore = maxBid + totalCardsDealt; // Max points from one round
+    const maxBid = cardsInRound;
+    const minPossibleWinningScore = cardsInRound; // Any bid made (min 0) + bonus
+    const maxPossibleWinningScore = maxBid + cardsInRound; // Bid max + bonus
+
+    const remainingPotential = getTotalRemainingPotential(currentRoundIndex + 1, numPlayers);
+    const totalPossibleRestOfGame = maxPossibleWinningScore + remainingPotential;
 
     // Sort players by score descending
     const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
-    // Check if all scores are 0
+    // Check if all scores are 0 (Round 1 pre-score)
     const allScoresZero = sortedPlayers.every(p => p.score === 0);
     if (allScoresZero) {
         return {
             show: false,
             position: 1,
             tiedWith: [],
+            isEliminated: false,
         };
     }
 
@@ -73,6 +116,7 @@ export function calculatePredictions(
             show: false,
             position: 1,
             tiedWith: [],
+            isEliminated: false,
         };
     }
 
@@ -89,35 +133,33 @@ export function calculatePredictions(
         show: true,
         position,
         tiedWith,
+        isEliminated: false,
     };
 
     // === OFFENSIVE HINTS (Catch up to player above) ===
     if (myIndex > 0) {
-        // Find player directly above (or first player with higher score for ties)
         const playerAbove = sortedPlayers[myIndex - 1];
+        const gap = playerAbove.score - myScore;
 
-        // If tied with player above, need just 1 point more than 0 to break tie
         if (playerAbove.score === myScore) {
-            // We're tied - any successful bid breaks the tie
+            // Tied - any successful bid breaks the tie (if they miss)
             result.catchUp = {
                 targetName: playerAbove.name,
                 targetScore: playerAbove.score,
-                minBid: 0, // Even bid 0 made gives totalCardsDealt points
+                minBid: 0,
                 impossible: false,
+                minBidIfTheyMake: 1, // Need at least 1 more if they also make bid
+                impossibleIfTheyMake: false
             };
         } else {
-            const gap = playerAbove.score - myScore;
-
             // Scenario 1: They miss their bid (get 0 pts)
             // You need gap + 1 points to pass them
-            const pointsNeededIfTheyMiss = gap + 1;
-            const minBidIfTheyMiss = Math.max(0, pointsNeededIfTheyMiss - totalCardsDealt);
+            const minBidIfTheyMiss = Math.max(0, gap + 1 - cardsInRound);
             const impossibleIfTheyMiss = minBidIfTheyMiss > maxBid;
 
-            // Scenario 2: They make their bid (min possible score is totalCardsDealt)
-            // You need gap + totalCardsDealt + 1 points to pass them
-            const pointsNeededIfTheyMake = gap + totalCardsDealt + 1;
-            const minBidIfTheyMake = Math.max(0, pointsNeededIfTheyMake - totalCardsDealt);
+            // Scenario 2: They make their bid (min possible score is cardsInRound)
+            // You need gap + cardsInRound + 1 points to pass them
+            const minBidIfTheyMake = Math.max(0, gap + 1);
             const impossibleIfTheyMake = minBidIfTheyMake > maxBid;
 
             result.catchUp = {
@@ -128,78 +170,101 @@ export function calculatePredictions(
                 minBidIfTheyMake: minBidIfTheyMake,
                 impossibleIfTheyMake: impossibleIfTheyMake
             };
+
+            // Elimination Check: Can they EVER pass the person above for the rest of the game?
+            if (gap > remainingPotential + maxPossibleWinningScore) {
+                result.isEliminated = true;
+            }
         }
     }
 
     // === DEFENSIVE HINTS (Stay ahead of player below) ===
     if (myIndex < sortedPlayers.length - 1) {
-        // Find player directly below
         const playerBelow = sortedPlayers[myIndex + 1];
         const gap = myScore - playerBelow.score;
 
-        // They can score at most maxPossibleScore
-        // They need to close the gap, so they need: gap + 1 points
-        // points = bid + totalCardsDealt, so they need bid >= (gap + 1 - totalCardsDealt)
-        const theyNeedPoints = gap + 1;
-        const theyNeedBid = Math.max(0, theyNeedPoints - totalCardsDealt);
-        const youAreSafe = theyNeedBid > maxBid;
+        // Scenario 1: You make your bid (min points = cardsInRound)
+        // They need gap + cardsInRound + 1 points to pass you
+        // Bid needed = (gap + cardsInRound + 1) - cardsInRound = gap + 1
+        const theyNeedIfYouMake = gap + 1;
+        const youAreSafeIfYouMake = theyNeedIfYouMake > maxBid;
+
+        // Scenario 2: You miss your bid (0 pts)
+        // They need gap + 1 points to pass you
+        // Bid needed = (gap + 1) - cardsInRound
+        const theyNeedIfYouMiss = Math.max(0, gap + 1 - cardsInRound);
+        const youAreSafeIfYouMiss = theyNeedIfYouMiss > maxBid;
 
         result.stayAhead = {
             threatName: playerBelow.name,
             threatScore: playerBelow.score,
-            theyNeedBid: youAreSafe ? maxBid + 1 : theyNeedBid,
-            youAreSafe,
-        };
+            theyNeedBid: youAreSafeIfYouMiss ? maxBid + 1 : theyNeedIfYouMiss,
+            youAreSafe: youAreSafeIfYouMiss,
+            // For internal use
+            theyNeedIfYouMake: youAreSafeIfYouMake ? maxBid + 1 : theyNeedIfYouMake,
+            youAreSafeIfYouMake
+        } as any;
     }
 
     // === WIN CONDITION HINTS ===
     if (position === 1) {
-        // I'm in 1st place (possibly tied)
         const secondPlace = sortedPlayers.find(p => p.score < myScore);
 
         if (!secondPlace) {
-            // Everyone is tied for 1st
             if (tiedWith.length > 0) {
                 result.winCondition = {
                     type: 'if_others_lose',
-                    message: `Tied for 1st! Any successful bid wins it.`,
+                    message: `Tied! Make your bid to take the lead.`,
                 };
             }
         } else {
             const gap = myScore - secondPlace.score;
 
-            // Check if win is guaranteed (gap > max possible score)
-            if (gap > maxPossibleScore) {
+            // Check if victory is guaranteed for the whole game
+            const secondPlaceMaxPossible = secondPlace.score + remainingPotential + maxPossibleWinningScore;
+            if (myScore > secondPlaceMaxPossible) {
                 result.winCondition = {
                     type: 'guaranteed',
                     message: `🏆 Victory secured! No one can catch you.`,
                 };
-            } else if (isFinalRound) {
-                // Check "if everyone loses" scenario
-                // If all players below score 0, I stay in 1st
-                const canWinByDefault = gap > 0;
-                if (canWinByDefault) {
-                    result.winCondition = {
-                        type: 'if_others_lose',
-                        message: `If everyone misses, you win!`,
-                    };
-                }
             } else {
-                // Not final round, but leading
-                result.winCondition = {
-                    type: 'lead_maintained',
-                    message: `Leading by ${gap} pts`,
-                };
+                // Not guaranteed yet. Analyze this round.
+                const stayAhead = result.stayAhead as any;
+                if (stayAhead) {
+                    if (stayAhead.youAreSafe) {
+                        result.winCondition = {
+                            type: 'lead_maintained',
+                            message: `Safe in 1st this round!`,
+                        };
+                    } else if (stayAhead.youAreSafeIfYouMake) {
+                        result.winCondition = {
+                            type: 'if_others_lose',
+                            message: isFinalRound
+                                ? `Make your bid to win! (Otherwise, make ${stayAhead.threatName} lose)`
+                                : `Make your bid to stay in 1st!`,
+                        };
+                    } else {
+                        result.winCondition = {
+                            type: 'if_others_lose',
+                            message: `Make ${stayAhead.threatName} lose to keep the lead!`,
+                        };
+                    }
+                }
             }
         }
-    }
-
-    // Handle ties at 1st - add context
-    if (position === 1 && tiedWith.length > 0 && !result.winCondition) {
-        result.winCondition = {
-            type: 'if_others_lose',
-            message: `Tied! Any made bid wins.`,
-        };
+    } else if (isFinalRound && result.catchUp && !result.isEliminated) {
+        // Final round catch-up advice
+        if (!result.catchUp.impossibleIfTheyMake) {
+            result.winCondition = {
+                type: 'if_others_lose',
+                message: `Bid ${result.catchUp.minBidIfTheyMake}+ to guaranteed overtake ${result.catchUp.targetName}!`,
+            };
+        } else if (!result.catchUp.impossible) {
+            result.winCondition = {
+                type: 'if_others_lose',
+                message: `Overtake ${result.catchUp.targetName} if they miss! (Need ${formatBidHint(result.catchUp.minBid)})`,
+            };
+        }
     }
 
     return result;

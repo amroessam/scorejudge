@@ -1,20 +1,35 @@
 import { supabaseAdmin } from './supabase';
 import { GameState, Player, Round, removeGame } from './store';
 import { DECK_SIZE } from './config';
+import { createLogger } from './logger';
+
+const log = createLogger({ module: 'db' });
 
 // --- User Operations ---
 
 export async function getUserByEmail(email: string) {
+    const startTime = Date.now();
+    log.debug({ email }, 'Fetching user by email');
+
     const { data, error } = await supabaseAdmin
         .from('users')
         .select('*')
         .eq('email', email)
         .single();
 
+    const duration = Date.now() - startTime;
+
     if (error && error.code !== 'PGRST116') { // PGRST116 is code for "no rows returned"
-        console.error('Error fetching user by email:', error);
+        log.error({ email, error: error.message, code: error.code, duration }, 'Error fetching user by email');
         return null;
     }
+
+    if (data) {
+        log.debug({ email, userId: data.id, duration }, 'User found');
+    } else {
+        log.debug({ email, duration }, 'User not found');
+    }
+
     return data;
 }
 
@@ -25,8 +40,17 @@ export async function upsertUser(user: {
     google_sub?: string;
     id?: string; // Allow passing custom ID for debug users
 }) {
+    const startTime = Date.now();
     // Use provided ID, or fall back to google_sub, or email as last resort
     const userId = user.id || user.google_sub || user.email;
+
+    log.info({
+        email: user.email,
+        userId,
+        name: user.name,
+        hasImage: !!user.image,
+        googleSub: user.google_sub
+    }, 'Upserting user');
 
     const { data, error } = await supabaseAdmin
         .from('users')
@@ -41,14 +65,32 @@ export async function upsertUser(user: {
         .select()
         .single();
 
+    const duration = Date.now() - startTime;
+
     if (error) {
-        console.error('Error upserting user:', error);
+        log.error({
+            email: user.email,
+            userId,
+            error: error.message,
+            code: error.code,
+            duration
+        }, 'Error upserting user');
         return null;
     }
+
+    log.info({
+        email: user.email,
+        userId: data.id,
+        duration
+    }, 'User upserted successfully');
+
     return data;
 }
 
 export async function updateUser(userId: string, updates: { display_name?: string; theme?: string; notifications_enabled?: boolean; sound_enabled?: boolean; image?: string }) {
+    const startTime = Date.now();
+    log.debug({ userId, updates }, 'Updating user');
+
     const { data, error } = await supabaseAdmin
         .from('users')
         .update({
@@ -59,16 +101,23 @@ export async function updateUser(userId: string, updates: { display_name?: strin
         .select()
         .single();
 
+    const duration = Date.now() - startTime;
+
     if (error) {
-        console.error('Error updating user:', error);
+        log.error({ userId, error: error.message, code: error.code, duration }, 'Error updating user');
         return null;
     }
+
+    log.info({ userId, updates, duration }, 'User updated successfully');
     return data;
 }
 
 // --- Game Operations ---
 
 export async function createGame(name: string, ownerId: string) {
+    const startTime = Date.now();
+    log.info({ name, ownerId }, 'Creating game');
+
     const { data, error } = await supabaseAdmin
         .from('games')
         .insert({
@@ -80,17 +129,26 @@ export async function createGame(name: string, ownerId: string) {
         .single();
 
     if (error) {
-        console.error('Error creating game:', error);
+        const duration = Date.now() - startTime;
+        log.error({ name, ownerId, error: error.message, code: error.code, duration }, 'Error creating game');
         return null;
     }
 
+    log.debug({ gameId: data.id, name, ownerId }, 'Game created, adding owner as first player');
+
     // Add owner as the first player
     await addPlayer(data.id, ownerId, 0);
+
+    const duration = Date.now() - startTime;
+    log.info({ gameId: data.id, name, ownerId, duration }, 'Game created successfully');
 
     return data;
 }
 
 export async function addPlayer(gameId: string, userId: string, order: number) {
+    const startTime = Date.now();
+    log.debug({ gameId, userId, order }, 'Adding player to game');
+
     const { error } = await supabaseAdmin
         .from('game_players')
         .insert({

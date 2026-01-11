@@ -1,0 +1,14 @@
+apm-server:
+  host: "0.0.0.0:8200"
+  rum:
+    enabled: true
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+
+# Disable Kibana integration for now
+apm-server.kibana:
+  enabled: false
+
+logging.level: info
+logging.to_stderr: true
