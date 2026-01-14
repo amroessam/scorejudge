@@ -437,13 +437,21 @@ export async function saveRoundTricks(gameId: string, roundIndex: number, tricks
         .update({ state: 'COMPLETED' })
         .eq('id', round.id);
 
-    // 4. Update total scores in game_players
-    for (const p of players) {
-        await supabaseAdmin
-            .from('game_players')
-            .update({ score: p.score })
-            .eq('game_id', gameId)
-            .eq('user_id', p.id);
+    // 4. Update total scores in game_players - BATCHED for performance
+    // Uses upsert with all players at once instead of sequential updates
+    const scoreEntries = players.map(p => ({
+        game_id: gameId,
+        user_id: p.id,
+        score: p.score
+    }));
+
+    const { error: scoresError } = await supabaseAdmin
+        .from('game_players')
+        .upsert(scoreEntries, { onConflict: 'game_id,user_id' });
+
+    if (scoresError) {
+        console.error('Error saving player scores:', scoresError);
+        return false;
     }
 
     return true;
