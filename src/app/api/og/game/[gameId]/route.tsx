@@ -289,7 +289,7 @@ export async function GET(
                 width: 750,
                 height: totalHeight,
                 headers: {
-                    'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=300',
+                    'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400',
                 },
             }
         );

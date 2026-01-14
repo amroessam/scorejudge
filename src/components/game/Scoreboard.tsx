@@ -169,6 +169,11 @@ export function Scoreboard({
     const [shareImageLoading, setShareImageLoading] = useState(false);
 
     useEffect(() => {
+        // DISABLED: Pre-fetch was causing unnecessary egress
+        // Images are now only generated when user clicks "Share"
+        // This saves ~1-3MB per game end that doesn't result in sharing
+        return;
+
         // Guard for test environment where fetch may not be available
         if (typeof window === 'undefined') return;
 
@@ -200,7 +205,7 @@ export function Scoreboard({
     }, [isGameEnded, gameId, shareImageBlob, shareImageLoading]);
 
     const handleCreateNewGame = () => {
-        router.push('/create');
+        window.location.href = '/create';
     };
 
     const handleShare = async () => {
@@ -273,7 +278,7 @@ export function Scoreboard({
     };
 
     const handleGoToDashboard = () => {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
     };
 
     // Calculate Dealer

@@ -92,6 +92,9 @@ export function ScoreEntryOverlay({
     // Local State
     const [inputs, setInputs] = useState<Record<string, number | string>>({});
     const [loading, setLoading] = useState(false);
+
+    // Prevent double-click submissions
+    const isSubmittingRef = useRef(false);
     const [error, setError] = useState<string | null>(null);
 
     // Refs for focus management (only for bids)
@@ -334,36 +337,74 @@ export function ScoreEntryOverlay({
     };
 
     const handleSubmit = async () => {
+        // Prevent double-click submissions
+        if (isSubmittingRef.current) {
+            console.log('[ScoreEntryOverlay] Submission already in progress, ignoring');
+            return;
+        }
+
         const validationError = validate();
         if (validationError) {
             setError(validationError);
             return;
         }
 
+        isSubmittingRef.current = true;
         setLoading(true);
-        try {
-            // Process inputs: Convert to numbers, default to 0 for bids only
-            const processedInputs: Record<string, number> = {};
-            for (const p of players) {
-                const val = inputs[p.email];
-                if (val === undefined || val === '') {
-                    processedInputs[p.email] = 0;
-                } else {
-                    processedInputs[p.email] = parseInt(val.toString());
-                }
-            }
+        setError(null);
 
-            const res = await fetch(`/api/games/${gameId}/rounds`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: type, inputs: processedInputs })
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                setError(data.error || "Failed to save");
+        // Process inputs: Convert to numbers, default to 0 for bids only
+        const processedInputs: Record<string, number> = {};
+        for (const p of players) {
+            const val = inputs[p.email];
+            if (val === undefined || val === '') {
+                processedInputs[p.email] = 0;
             } else {
-                // Check if game has ended - if so, update state immediately to show end screen
+                processedInputs[p.email] = parseInt(val.toString());
+            }
+        }
+
+        // Retry logic with exponential backoff
+        const maxRetries = 3;
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const res = await fetch(`/api/games/${gameId}/rounds`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: type, inputs: processedInputs })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    // Handle specific HTTP errors
+                    if (res.status === 403) {
+                        setError("Session expired - please refresh the page");
+                        break;
+                    } else if (res.status >= 500) {
+                        // Server error - retry
+                        lastError = new Error(data.error || "Server error");
+                        if (attempt < maxRetries) {
+                            console.log(`[ScoreEntryOverlay] Server error, retrying (${attempt}/${maxRetries})...`);
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 500));
+                            continue;
+                        }
+                        setError(data.error || "Server error - please try again");
+                    } else {
+                        setError(data.error || "Failed to save");
+                    }
+                    break;
+                }
+
+                // Success! Update state FIRST, then close overlay
+                // This fixes the race condition that was causing round skipping
+                if (data.game) {
+                    onGameUpdate(data.game);
+                }
+
+                // Check if game has ended
                 const finalRoundNumber = getFinalRoundNumber(players.length);
                 const completedRounds = data.game?.rounds?.filter((r: any) => r.state === 'COMPLETED') || [];
                 const lastCompletedRound = completedRounds.length > 0
@@ -371,30 +412,34 @@ export function ScoreEntryOverlay({
                     : 0;
                 const isGameEnded = lastCompletedRound >= finalRoundNumber;
 
-                if (isGameEnded && data.game) {
-                    // Game ended - update state immediately to show end screen and confetti
-                    onGameUpdate(data.game);
-                    // Close overlay after a brief delay to allow state update
-                    setTimeout(() => {
-                        onClose();
-                    }, 100);
+                // Close overlay after state is updated
+                if (isGameEnded) {
+                    // Small delay for game end to allow confetti trigger
+                    setTimeout(() => onClose(), 100);
                 } else {
-                    // Normal round completion - close overlay first, then update state
                     onClose();
-                    // Update game state after animation completes (spring animation ~500ms)
-                    setTimeout(() => {
-                        if (data.game) onGameUpdate(data.game);
-                    }, 500);
+                }
+
+                // Exit retry loop on success
+                break;
+
+            } catch (e: any) {
+                lastError = e;
+                console.error(`[ScoreEntryOverlay] Network error (attempt ${attempt}/${maxRetries}):`, e);
+
+                if (attempt < maxRetries) {
+                    // Exponential backoff: 500ms, 1000ms, 2000ms
+                    const delay = Math.pow(2, attempt) * 500;
+                    setError(`Connection issue - retrying in ${delay / 1000}s...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    setError("Failed after multiple attempts - please check your connection and try again");
                 }
             }
-        } catch (e: any) {
-            // Show more specific error message if available
-            const errorMessage = e?.message || "Network error - please check your connection";
-            setError(errorMessage);
-            console.error("[ScoreEntryOverlay] Submit error:", e);
-        } finally {
-            setLoading(false);
         }
+
+        setLoading(false);
+        isSubmittingRef.current = false;
     };
 
     const handleUndo = async () => {
