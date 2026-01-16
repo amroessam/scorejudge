@@ -212,7 +212,7 @@ export async function getGame(gameId: string): Promise<GameState | null> {
             name: gp.user.display_name || gp.user.name || 'Unknown',
             email: gp.user.email,
             image: gp.user.image,
-            score: gp.score,
+            score: gp.score || 0,
             bid: 0, // Current round bid (populated as needed)
             tricks: 0, // Current round tricks (populated as needed)
         }));
@@ -450,10 +450,11 @@ export async function saveRoundTricks(gameId: string, roundIndex: number, tricks
         .upsert(scoreEntries, { onConflict: 'game_id,user_id' });
 
     if (scoresError) {
-        console.error('Error saving player scores:', scoresError);
+        log.error({ gameId, error: scoresError.message, scoreEntries }, 'Error saving player scores');
         return false;
     }
 
+    log.info({ gameId, roundIndex, scoreEntries }, 'Successfully saved player scores');
     return true;
 }
 
@@ -509,7 +510,7 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             ),
             rounds(state)
         `)
-        .gte('created_at', '2026-01-01');
+        .order('created_at', { ascending: false });
 
     if (error || !games) {
         console.error('Error fetching games for leaderboard:', error);
@@ -517,11 +518,18 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
     }
 
     // 2. Filter to only completed games (last round is COMPLETED)
-    const completedGames = games.filter(game => {
+    const completedGames = (games || []).filter(game => {
         const rounds = game.rounds as { state: string }[];
         if (!rounds || rounds.length === 0) return false;
+        // A game is completed for the global leaderboard if it has at least one COMPLETED round
+        // We could make this stricter (e.g., must have the final round completed)
         return rounds.some(r => r.state === 'COMPLETED');
     });
+
+    log.info({
+        totalGamesFetched: games?.length || 0,
+        completedGamesCount: completedGames.length
+    }, 'Leaderboard data fetched');
 
     // 3. Aggregate stats per player (by email)
     const playerStats: Record<string, {
@@ -582,6 +590,8 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             playerStats[email].gamesPlayed++;
             playerStats[email].totalScore += score;
             playerStats[email].percentileSum += percentile;
+
+            log.debug({ email, gameId: game.id, score, rank, percentile }, 'Aggregated player stats for game');
 
             // Track placements
             if (rank === 1) playerStats[email].wins++;

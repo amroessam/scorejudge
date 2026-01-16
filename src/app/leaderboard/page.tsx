@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Trophy, Loader2, Crown, Share2, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 import { getAvatarUrl } from "@/lib/utils";
+import { ShareableLeaderboard } from "@/components/sharing/ShareableLeaderboard";
+import { toBlob } from "html-to-image";
 
 interface LeaderboardEntry {
     email: string;
@@ -29,9 +31,7 @@ export default function LeaderboardPage() {
     const [isSharing, setIsSharing] = useState(false);
     const [selectedPlayer, setSelectedPlayer] = useState<LeaderboardEntry | null>(null);
 
-    // Pre-fetching state
-    const [prefetchedImage, setPrefetchedImage] = useState<Blob | null>(null);
-    const [isPrefetching, setIsPrefetching] = useState(false);
+    const leaderboardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetch("/api/leaderboard")
@@ -49,72 +49,62 @@ export default function LeaderboardPage() {
             });
     }, []);
 
-    // Pre-fetch share image as soon as data is ready
-    useEffect(() => {
-        if (!loading && leaderboard.length > 0 && !prefetchedImage && !isPrefetching) {
-            setIsPrefetching(true);
-            console.log("[Leaderboard] Pre-fetching share image...");
-            fetch("/api/og/leaderboard")
-                .then(res => res.ok ? res.blob() : null)
-                .then(blob => {
-                    if (blob) {
-                        console.log("[Leaderboard] Share image pre-fetched:", blob.size, "bytes");
-                        setPrefetchedImage(blob);
-                    }
-                })
-                .catch(err => console.error("[Leaderboard] Pre-fetch failed:", err))
-                .finally(() => setIsPrefetching(false));
-        }
-    }, [loading, leaderboard, prefetchedImage, isPrefetching]);
-
-    const handleShare = async () => {
+    const onShare = async () => {
         setIsSharing(true);
         try {
-            let blob = prefetchedImage;
+            if (!leaderboardRef.current) return;
 
-            if (!blob) {
-                console.log("[Leaderboard] No pre-fetched image, fetching now...");
-                const response = await fetch("/api/og/leaderboard");
-                if (!response.ok) throw new Error("Failed to generate image");
-                blob = await response.blob();
-            } else {
-                console.log("[Leaderboard] Using pre-fetched image");
-            }
+            // Use html-to-image for better fidelity
+            const blob = await toBlob(leaderboardRef.current, {
+                cacheBust: true,
+                pixelRatio: 3,
+                backgroundColor: '#050510',
+                style: {
+                    transform: 'scale(1)',
+                    transformOrigin: 'top left'
+                }
+            });
 
-            const file = new File([blob], "scorejudge-leaderboard.png", { type: "image/png" });
+            if (!blob) throw new Error('Failed to generate leaderboard blob');
 
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            const file = new File([blob], 'leaderboard.png', { type: 'image/png' });
+
+            if (navigator.share) {
                 try {
                     await navigator.share({
-                        files: [file],
-                        title: "ScoreJudge Leaderboard",
-                        text: "Check out the ScoreJudge Global Leaderboard!",
+                        title: 'Global Leaderboard',
+                        text: 'Check out the ScoreJudge global rankings!',
+                        files: [file]
                     });
-                } catch (shareError: any) {
-                    if (shareError.name === "NotAllowedError" || shareError.name !== "AbortError") {
-                        downloadImage(blob);
+                } catch (e) {
+                    if ((e as Error).name !== 'AbortError') {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'leaderboard.png';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
                     }
                 }
             } else {
-                downloadImage(blob);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'leaderboard.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             }
-        } catch (err) {
-            console.error("Share failed:", err);
-            alert("Failed to share leaderboard. Please try again.");
+
+        } catch (e) {
+            console.error('Error sharing leaderboard:', e);
+            alert('Failed to share leaderboard');
         } finally {
             setIsSharing(false);
         }
-    };
-
-    const downloadImage = (blob: Blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "scorejudge-leaderboard.png";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
     };
 
     if (loading) {
@@ -141,7 +131,7 @@ export default function LeaderboardPage() {
                         <span>Back</span>
                     </Link>
                     <button
-                        onClick={handleShare}
+                        onClick={onShare}
                         disabled={isSharing || leaderboard.length === 0}
                         className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-full font-medium hover:bg-[var(--primary)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md active:scale-95 transition-transform"
                     >
@@ -308,6 +298,13 @@ export default function LeaderboardPage() {
                     </div>
                 </div>
             )}
+            {/* Hidden Leaderboard for Capture */}
+            <div style={{ position: 'absolute', top: -9999, left: -9999, visibility: 'visible' }}>
+                <ShareableLeaderboard
+                    ref={leaderboardRef}
+                    leaderboard={leaderboard}
+                />
+            </div>
         </div>
     );
 }

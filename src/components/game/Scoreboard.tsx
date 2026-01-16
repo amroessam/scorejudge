@@ -20,10 +20,11 @@ import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
 import { PredictionHint } from "./PredictionHint";
 import { DECK_SIZE } from "@/lib/config";
-import { calculatePredictions } from "@/lib/predictions";
-import confetti from "canvas-confetti";
+import { ShareableScorecard } from "@/components/sharing/ShareableScorecard";
+import { toBlob } from "html-to-image";
 import { AnimatePresence, motion } from "framer-motion";
 import { getAvatarUrl } from "@/lib/utils";
+import { calculatePredictions } from "@/lib/predictions";
 
 interface ScoreboardProps {
     gameId: string;
@@ -164,45 +165,7 @@ export function Scoreboard({
         );
     }, [currentUserEmail, players, activeRound, isGameEnded, isFinalRound]);
 
-    // Pre-fetch share image when game ends to enable instant sharing
-    const [shareImageBlob, setShareImageBlob] = useState<Blob | null>(null);
-    const [shareImageLoading, setShareImageLoading] = useState(false);
-
-    useEffect(() => {
-        // DISABLED: Pre-fetch was causing unnecessary egress
-        // Images are now only generated when user clicks "Share"
-        // This saves ~1-3MB per game end that doesn't result in sharing
-        return;
-
-        // Guard for test environment where fetch may not be available
-        if (typeof window === 'undefined') return;
-
-        if (isGameEnded && !shareImageBlob && !shareImageLoading) {
-            setShareImageLoading(true);
-            console.log('[Scoreboard] Pre-fetching share image...');
-
-            try {
-                const fetchResult = fetch(`/api/og/game/${gameId}`);
-                // Guard against mocked/undefined fetch in tests
-                if (fetchResult && typeof fetchResult.then === 'function') {
-                    fetchResult
-                        .then(res => res.ok ? res.blob() : null)
-                        .then(blob => {
-                            if (blob) {
-                                console.log('[Scoreboard] Share image pre-fetched:', blob.size, 'bytes');
-                                setShareImageBlob(blob);
-                            }
-                        })
-                        .catch(err => console.error('[Scoreboard] Pre-fetch failed:', err))
-                        .finally(() => setShareImageLoading(false));
-                } else {
-                    setShareImageLoading(false);
-                }
-            } catch {
-                setShareImageLoading(false);
-            }
-        }
-    }, [isGameEnded, gameId, shareImageBlob, shareImageLoading]);
+    const scorecardRef = useRef<HTMLDivElement>(null);
 
     const handleCreateNewGame = () => {
         window.location.href = '/create';
@@ -210,71 +173,63 @@ export function Scoreboard({
 
     const handleShare = async () => {
         setIsSharing(true);
-        console.log('[Scoreboard] Sharing started...');
+        try {
+            if (!scorecardRef.current) return;
 
-        // Use pre-cached blob if available (enables instant share)
-        let blob: Blob | null = shareImageBlob;
-
-        if (!blob) {
-            console.log('[Scoreboard] No cached image, fetching...');
-            try {
-                const response = await fetch(`/api/og/game/${gameId}`);
-                if (!response.ok) {
-                    throw new Error(`Failed to generate image: ${response.status}`);
+            // Use html-to-image to capture the pre-rendered component
+            // We use pixelRatio: 3 to ensure very high quality (better than standard Retina)
+            const blob = await toBlob(scorecardRef.current, {
+                cacheBust: true,
+                pixelRatio: 3,
+                backgroundColor: '#050510', // Consistent background
+                style: {
+                    // Ensure the element is fully visible for the capture logic, even if offscreen
+                    transform: 'scale(1)',
+                    transformOrigin: 'top left'
                 }
-                blob = await response.blob();
-                console.log(`[Scoreboard] Fetched blob: ${blob.size} bytes`);
-            } catch (error) {
-                console.error('[Scoreboard] Fetch failed:', error);
-                alert('Failed to generate share image. Please try again.');
-                setIsSharing(false);
-                return;
-            }
-        } else {
-            console.log('[Scoreboard] Using pre-cached image:', blob.size, 'bytes');
-        }
+            });
 
-        // Try native share
-        const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
+            if (!blob) throw new Error('Failed to generate image blob');
 
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-                console.log('[Scoreboard] Attempting navigator.share');
-                await navigator.share({
-                    files: [file],
-                    title: 'ScoreJudge Results',
-                    text: `Game results for ${gameName || 'ScoreJudge'}!`
-                });
-                console.log('[Scoreboard] Share successful');
-            } catch (shareError: any) {
-                // If share fails (gesture timing), download as fallback
-                if (shareError.name === 'NotAllowedError') {
-                    console.log('[Scoreboard] Gesture timing issue, downloading instead');
-                    downloadImage(blob);
-                } else if (shareError.name !== 'AbortError') {
-                    // User cancelled is fine, other errors show download
-                    console.log('[Scoreboard] Share error, downloading:', shareError.message);
-                    downloadImage(blob);
+            const file = new File([blob], 'scorejudge-results.png', { type: 'image/png' });
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'ScoreJudge Results',
+                        text: `Game results for ${gameState.name}`,
+                        files: [file]
+                    });
+                } catch (e) {
+                    // Fallback to download if share is cancelled/fails
+                    if ((e as Error).name !== 'AbortError') {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'scorejudge-results.png';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }
                 }
+                // Fallback download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'scorejudge-results.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             }
-        } else {
-            console.log('[Scoreboard] Navigator.share not available, downloading');
-            downloadImage(blob);
+
+        } catch (e) {
+            console.error('Error sharing results:', e);
+            alert('Failed to generate image. Please try again.');
+        } finally {
+            setIsSharing(false);
         }
-
-        console.log('[Scoreboard] Sharing finished');
-        setIsSharing(false);
-    };
-
-    const downloadImage = (blob: Blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'scorejudge-results.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
     };
 
     const handleGoToDashboard = () => {
@@ -723,6 +678,15 @@ export function Scoreboard({
                 player={selectedPlayer}
                 rounds={rounds}
             />
+
+            {/* Hidden Scorecard for Capture */}
+            <div style={{ position: 'absolute', top: -9999, left: -9999, visibility: 'visible' }}>
+                <ShareableScorecard
+                    ref={scorecardRef}
+                    gameName={gameState.name}
+                    players={gameState.players}
+                />
+            </div>
         </div>
     );
 }
