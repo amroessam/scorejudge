@@ -504,7 +504,6 @@ export interface LeaderboardEntry {
 }
 
 export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
-    // 1. Get all completed games with their players and scores
     const { data: games, error } = await supabaseAdmin
         .from('games')
         .select(`
@@ -513,16 +512,17 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
                 score,
                 user:users!user_id(id, email, name, display_name, image)
             ),
-            rounds!inner(state)
+            rounds(state)
         `)
-        .eq('rounds.state', 'COMPLETED')
         .order('created_at', { ascending: false })
-        .range(0, 3000);
+        .limit(1000);
 
     if (error || !games) {
-        console.error('Error fetching games for leaderboard:', error);
+        console.error('[Leaderboard] Error fetching games:', error);
         return [];
     }
+
+    console.log(`[Leaderboard] Successfully fetched ${games.length} games from DB`);
 
     // 2. Filter to only completed games (last round is COMPLETED)
     const completedGames = (games || []).filter(game => {
