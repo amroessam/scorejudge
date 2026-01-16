@@ -14,10 +14,10 @@ import { getGame, setGame } from './src/lib/store';
 // Simulated test data
 const testGameId = 'test-game-123';
 const testPlayers = [
-    { id: 'user1', name: 'Player 1', email: 'player1@test.com', tricks: 0, bid: 0, score: 0 },
-    { id: 'user2', name: 'Player 2', email: 'player2@test.com', tricks: 0, bid: 0, score: 0 },
-    { id: 'user3', name: 'Player 3', email: 'player3@test.com', tricks: 0, bid: 0, score: 0 },
-    { id: 'user4', name: 'Player 4', email: 'player4@test.com', tricks: 0, bid: 0, score: 0 },
+    { id: 'user1', name: 'Player 1', email: 'player1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+    { id: 'user2', name: 'Player 2', email: 'player2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+    { id: 'user3', name: 'Player 3', email: 'player3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
+    { id: 'user4', name: 'Player 4', email: 'player4@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 3 },
 ];
 
 console.log('=== ScoreJudge Game Flow Test ===\n');
@@ -48,7 +48,8 @@ for (let i = 1; i < 4; i++) {
             ...testPlayers[i],
             score: 0,
             bid: 0,
-            tricks: 0
+            tricks: 0,
+            playerOrder: i
         });
         setGame(testGameId, game);
         console.log(`✓ ${testPlayers[i].name} joined (${game.players.length} players)`);
@@ -62,10 +63,10 @@ function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
     const maxCards = Math.floor(52 / numPlayers);
     const rounds: { cards: number, trump: string }[] = [];
     const TRUMPS = ['S', 'D', 'C', 'H', 'NT'];
-    
+
     for (let i = 1; i <= maxCards; i++) rounds.push({ cards: i, trump: '' });
     for (let i = maxCards - 1; i >= 1; i--) rounds.push({ cards: i, trump: '' });
-    
+
     return rounds.map((r, i) => ({ ...r, trump: TRUMPS[i % 5] }));
 }
 
@@ -94,9 +95,9 @@ let bids: Record<string, number> = {};
 if (round1) {
     console.log(`  Cards per player: ${round1.cards}`);
     console.log(`  Trump: ${round1.trump}`);
-    
+
     // Example bids that sum to cards per player (1)
-    bids = { 
+    bids = {
         [testPlayers[0].email]: 1,
         [testPlayers[1].email]: 0,
         [testPlayers[2].email]: 0,
@@ -105,7 +106,7 @@ if (round1) {
     const sumBids = Object.values(bids).reduce((a, b) => a + b, 0);
     console.log(`  Bids: ${Object.entries(bids).map(([email, bid]) => `${testPlayers.find(p => p.email === email)?.name}: ${bid}`).join(', ')}`);
     console.log(`  Sum: ${sumBids} (should equal ${round1.cards})`);
-    
+
     if (sumBids === round1.cards) {
         console.log('  ✓ Bids are valid\n');
     } else {
@@ -122,9 +123,9 @@ if (round1 && game) {
         [testPlayers[2].email]: 0, // Made bid
         [testPlayers[3].email]: 0  // Made bid
     };
-    
+
     const totalCards = round1.cards * game.players.length; // 1 * 4 = 4
-    
+
     game.players.forEach(p => {
         const bid = bids[p.email];
         const trick = tricks[p.email];
