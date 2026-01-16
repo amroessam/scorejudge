@@ -537,6 +537,7 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
     }, 'Leaderboard data fetched');
 
     // 3. Aggregate stats per player (by email)
+    console.log(`[Leaderboard] Processing ${completedGames.length} completed games`);
     const playerStats: Record<string, {
         email: string;
         name: string;
@@ -551,8 +552,14 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
     }> = {};
 
     for (const game of completedGames) {
-        const gamePlayers = game.game_players as any[];
-        if (!gamePlayers || gamePlayers.length < 2) continue; // Need at least 2 players
+        // Handle postgrest response variance
+        const rawPlayers = game.game_players;
+        const gamePlayers = Array.isArray(rawPlayers) ? rawPlayers : [];
+
+        if (gamePlayers.length < 2) {
+            console.log(`[Leaderboard] Skipping game ${game.id}: only ${gamePlayers.length} players found`);
+            continue;
+        }
 
         const numPlayers = gamePlayers.length;
 
@@ -566,7 +573,7 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             const user = Array.isArray(userData) ? userData[0] : userData;
 
             if (!user || !user.email) {
-                log.debug({ gp }, 'Skipping player entry due to missing user data');
+                console.log(`[Leaderboard] Game ${game.id}: Player missing user data or email`, { gp });
                 continue;
             }
 
@@ -614,6 +621,7 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             }
         }
     }
+    console.log(`[Leaderboard] Aggregation complete. Found ${Object.keys(playerStats).length} unique players.`);
 
     // 4. Convert to array, calculate rates, filter min 3 games, sort by averagePercentile
     const leaderboard: LeaderboardEntry[] = Object.values(playerStats)
