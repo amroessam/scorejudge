@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import confetti from "canvas-confetti";
 import {
     Settings,
     Plus,
