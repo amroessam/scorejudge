@@ -562,8 +562,13 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         const minScore = Math.min(...scores);
 
         for (const gp of gamePlayers) {
-            const user = gp.user;
-            if (!user || !user.email) continue;
+            const userData = gp.user;
+            const user = Array.isArray(userData) ? userData[0] : userData;
+
+            if (!user || !user.email) {
+                log.debug({ gp }, 'Skipping player entry due to missing user data');
+                continue;
+            }
 
             const email = user.email;
             const score = gp.score || 0;
