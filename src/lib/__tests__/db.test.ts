@@ -102,7 +102,7 @@ describe('db.ts (Supabase Data Access Layer)', () => {
                                 id: 'game-1',
                                 name: 'My Game',
                                 game_players: [
-                                    { user_id: 'user-1', user: { id: 'user-1', email: 'test@example.com', name: 'Test' }, score: 0 }
+                                    { user_id: 'user-1', user: { id: 'user-1', email: 'test@example.com', name: 'Test' }, score: 0, player_order: 0 }
                                 ],
                                 rounds: [],
                                 owner: { email: 'test@example.com' },

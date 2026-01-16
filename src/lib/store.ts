@@ -8,6 +8,7 @@ export interface Player {
     tricks: number;
     bid: number;
     score: number;
+    playerOrder: number;
     image?: string;
 }
 

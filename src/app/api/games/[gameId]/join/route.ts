@@ -79,6 +79,7 @@ export async function POST(
         score: 0,
         bid: 0,
         tricks: 0,
+        playerOrder: game.players.length,
         image: user.image
     };
 

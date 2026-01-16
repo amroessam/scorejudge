@@ -213,6 +213,7 @@ export async function getGame(gameId: string): Promise<GameState | null> {
             email: gp.user.email,
             image: gp.user.image,
             score: gp.score || 0,
+            playerOrder: gp.player_order,
             bid: 0, // Current round bid (populated as needed)
             tricks: 0, // Current round tricks (populated as needed)
         }));
@@ -437,12 +438,16 @@ export async function saveRoundTricks(gameId: string, roundIndex: number, tricks
         .update({ state: 'COMPLETED' })
         .eq('id', round.id);
 
-    // 4. Update total scores in game_players - BATCHED for performance
-    // Uses upsert with all players at once instead of sequential updates
+    // 4. Update total scores in game_players
+    return saveGamePlayerScores(gameId, players);
+}
+
+export async function saveGamePlayerScores(gameId: string, players: Player[]) {
     const scoreEntries = players.map(p => ({
         game_id: gameId,
         user_id: p.id,
-        score: p.score
+        score: p.score,
+        player_order: p.playerOrder
     }));
 
     const { error: scoresError } = await supabaseAdmin
@@ -454,7 +459,7 @@ export async function saveRoundTricks(gameId: string, roundIndex: number, tricks
         return false;
     }
 
-    log.info({ gameId, roundIndex, scoreEntries }, 'Successfully saved player scores');
+    log.info({ gameId, scoreEntries }, 'Successfully saved player scores');
     return true;
 }
 

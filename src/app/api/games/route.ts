@@ -217,6 +217,7 @@ export async function POST(req: NextRequest) {
                         tricks: 0,
                         bid: 0,
                         score: 0,
+                        playerOrder: 0,
                         image: user.image
                     }],
                     rounds: [],

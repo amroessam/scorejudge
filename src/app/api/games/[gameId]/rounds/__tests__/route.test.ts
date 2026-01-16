@@ -57,6 +57,7 @@ describe('/api/games/[gameId]/rounds', () => {
     tricks: 0,
     bid: 0,
     score: 0,
+    playerOrder: 0,
     ...overrides,
   });
 

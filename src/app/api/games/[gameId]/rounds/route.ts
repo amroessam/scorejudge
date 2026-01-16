@@ -9,6 +9,7 @@ import {
     initializeRounds,
     saveRoundBids,
     saveRoundTricks,
+    saveGamePlayerScores,
     updateGame as updateDbGame
 } from "@/lib/db";
 import { createLogger } from "@/lib/logger";
@@ -386,13 +387,10 @@ export async function POST(
                                     pointsRemoved: pointsToRemove
                                 });
                             }
-
-                            await supabaseAdmin
-                                .from('game_players')
-                                .update({ score: p.score })
-                                .eq('game_id', gameId)
-                                .eq('user_id', p.id);
                         }
+
+                        // Batch update scores
+                        await saveGamePlayerScores(gameId, game.players);
 
                         round.state = 'PLAYING';
                         round.tricks = {};
