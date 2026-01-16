@@ -54,6 +54,35 @@ export default function LeaderboardPage() {
         try {
             if (!leaderboardRef.current) return;
 
+            // Pre-convert all player images to base64 to avoid iOS CORS issues
+            const leaderboardWithBase64 = await Promise.all(
+                leaderboard.map(async (player) => {
+                    if (!player.image || player.image.startsWith('data:')) {
+                        return player; // Already base64 or no image
+                    }
+                    try {
+                        const response = await fetch(player.image);
+                        const blob = await response.blob();
+                        return new Promise<LeaderboardEntry>((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                resolve({ ...player, image: reader.result as string });
+                            };
+                            reader.onerror = () => resolve(player); // Fallback to original
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch {
+                        return player; // Fallback to original on error
+                    }
+                })
+            );
+
+            // Temporarily update the leaderboard with base64 images for capture
+            setLeaderboard(leaderboardWithBase64);
+
+            // Wait for React to re-render with base64 images
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             // Use html-to-image for better fidelity
             const blob = await toBlob(leaderboardRef.current, {
                 cacheBust: true,
@@ -64,6 +93,9 @@ export default function LeaderboardPage() {
                     transformOrigin: 'top left'
                 }
             });
+
+            // Restore original leaderboard (with original image URLs)
+            setLeaderboard(leaderboard);
 
             if (!blob) throw new Error('Failed to generate leaderboard blob');
 
