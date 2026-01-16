@@ -504,42 +504,82 @@ export interface LeaderboardEntry {
 }
 
 export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
-    const { data: games, error } = await supabaseAdmin
-        .from('games')
-        .select(`
-            id,
-            game_players(
-                score,
-                user:users!user_id(id, email, name, display_name, image)
-            ),
-            rounds(state)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(1000);
+    // OPTIMIZED: Split into separate queries to avoid Supabase statement timeout
+    // The nested join with user images was causing timeouts on free tier
 
-    if (error || !games) {
-        console.error('[Leaderboard] Error fetching games:', error);
+    // Step 1: Get completed game IDs first (fast query)
+    const { data: gamesWithRounds, error: gamesError } = await supabaseAdmin
+        .from('games')
+        .select('id, rounds(state)')
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+    if (gamesError || !gamesWithRounds) {
+        console.error('[Leaderboard] Error fetching games:', gamesError);
         return [];
     }
 
-    console.log(`[Leaderboard] Successfully fetched ${games.length} games from DB`);
+    // Filter to only completed games
+    const completedGameIds = gamesWithRounds
+        .filter(game => {
+            const rounds = game.rounds as { state: string }[];
+            return rounds && rounds.some(r => r.state === 'COMPLETED');
+        })
+        .map(g => g.id);
 
-    // 2. Filter to only completed games (last round is COMPLETED)
-    const completedGames = (games || []).filter(game => {
-        const rounds = game.rounds as { state: string }[];
-        if (!rounds || rounds.length === 0) return false;
-        // A game is completed for the global leaderboard if it has at least one COMPLETED round
-        // We could make this stricter (e.g., must have the final round completed)
-        return rounds.some(r => r.state === 'COMPLETED');
-    });
+    console.log(`[Leaderboard] Found ${completedGameIds.length} completed games out of ${gamesWithRounds.length}`);
+
+    if (completedGameIds.length === 0) {
+        return [];
+    }
+
+    // Step 2: Get game_players for completed games (without user join - much faster)
+    const { data: gamePlayers, error: playersError } = await supabaseAdmin
+        .from('game_players')
+        .select('game_id, user_id, score')
+        .in('game_id', completedGameIds);
+
+    if (playersError || !gamePlayers) {
+        console.error('[Leaderboard] Error fetching game_players:', playersError);
+        return [];
+    }
+
+    console.log(`[Leaderboard] Fetched ${gamePlayers.length} game_player records`);
+
+    // Step 3: Get unique user IDs and fetch users separately
+    const userIds = [...new Set(gamePlayers.map(gp => gp.user_id))];
+
+    const { data: users, error: usersError } = await supabaseAdmin
+        .from('users')
+        .select('id, email, name, display_name, image')
+        .in('id', userIds);
+
+    if (usersError || !users) {
+        console.error('[Leaderboard] Error fetching users:', usersError);
+        return [];
+    }
+
+    console.log(`[Leaderboard] Fetched ${users.length} users`);
+
+    // Build user lookup map
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    // Group game_players by game_id
+    const gamePlayersMap: Record<string, typeof gamePlayers> = {};
+    for (const gp of gamePlayers) {
+        if (!gamePlayersMap[gp.game_id]) {
+            gamePlayersMap[gp.game_id] = [];
+        }
+        gamePlayersMap[gp.game_id].push(gp);
+    }
 
     log.info({
-        totalGamesFetched: games?.length || 0,
-        completedGamesCount: completedGames.length
+        completedGamesCount: completedGameIds.length,
+        totalPlayers: gamePlayers.length,
+        uniqueUsers: users.length
     }, 'Leaderboard data fetched');
 
-    // 3. Aggregate stats per player (by email)
-    console.log(`[Leaderboard] Processing ${completedGames.length} completed games`);
+    // Step 4: Aggregate stats per player (by email)
     const playerStats: Record<string, {
         email: string;
         name: string;
@@ -550,48 +590,34 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         thirdPlace: number;
         totalScore: number;
         lastPlaceCount: number;
-        percentileSum: number; // Sum of percentiles for averaging
+        percentileSum: number;
     }> = {};
 
-    for (const game of completedGames) {
-        // Handle postgrest response variance
-        const rawPlayers = game.game_players;
-        const gamePlayers = Array.isArray(rawPlayers) ? rawPlayers : [];
+    for (const gameId of completedGameIds) {
+        const players = gamePlayersMap[gameId] || [];
 
-        if (gamePlayers.length < 2) {
-            console.log(`[Leaderboard] Skipping game ${game.id}: only ${gamePlayers.length} players found`);
+        if (players.length < 2) {
             continue;
         }
 
-        const numPlayers = gamePlayers.length;
-
-        // Get distinct scores sorted descending
-        const scores = gamePlayers.map(gp => gp.score || 0);
+        const numPlayers = players.length;
+        const scores = players.map(gp => gp.score || 0);
         const distinctScores = [...new Set(scores)].sort((a, b) => b - a);
         const minScore = Math.min(...scores);
 
-        for (const gp of gamePlayers) {
-            const userData = gp.user;
-            const user = Array.isArray(userData) ? userData[0] : userData;
-
+        for (const gp of players) {
+            const user = userMap.get(gp.user_id);
             if (!user || !user.email) {
-                console.log(`[Leaderboard] Game ${game.id}: Player missing user data or email`, { gp });
                 continue;
             }
 
             const email = user.email;
             const score = gp.score || 0;
             const rank = distinctScores.indexOf(score) + 1;
-
-            // Calculate percentile for this game
-            // Formula: (players - rank) / (players - 1) * 100
-            // 1st place = 100%, Last place = 0%
             const percentile = ((numPlayers - rank) / (numPlayers - 1)) * 100;
 
             if (!playerStats[email]) {
-                // Determine best name to show: display_name -> name -> email prefix
-                const displayName = user.display_name || user.name || (email ? email.split('@')[0] : 'Unknown');
-
+                const displayName = user.display_name || user.name || email.split('@')[0];
                 playerStats[email] = {
                     email,
                     name: displayName,
@@ -610,22 +636,19 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             playerStats[email].totalScore += score;
             playerStats[email].percentileSum += percentile;
 
-            log.debug({ email, gameId: game.id, score, rank, percentile }, 'Aggregated player stats for game');
-
-            // Track placements
             if (rank === 1) playerStats[email].wins++;
             else if (rank === 2) playerStats[email].secondPlace++;
             else if (rank === 3) playerStats[email].thirdPlace++;
 
-            // Last place if tied for min score (and not everyone tied)
             if (score === minScore && distinctScores.length > 1) {
                 playerStats[email].lastPlaceCount++;
             }
         }
     }
+
     console.log(`[Leaderboard] Aggregation complete. Found ${Object.keys(playerStats).length} unique players.`);
 
-    // 4. Convert to array, calculate rates, filter min 3 games, sort by averagePercentile
+    // Step 5: Convert to array, calculate rates, filter min 3 games, sort
     const leaderboard: LeaderboardEntry[] = Object.values(playerStats)
         .filter(p => p.gamesPlayed >= 3)
         .map(p => ({
@@ -643,7 +666,6 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             podiumRate: p.gamesPlayed > 0 ? Math.round(((p.wins + p.secondPlace + p.thirdPlace) / p.gamesPlayed) * 100) : 0,
         }))
         .sort((a, b) => {
-            // Sort by averagePercentile (desc), then wins (desc), then total score (desc)
             if (b.averagePercentile !== a.averagePercentile) return b.averagePercentile - a.averagePercentile;
             if (b.wins !== a.wins) return b.wins - a.wins;
             return b.totalScore - a.totalScore;
