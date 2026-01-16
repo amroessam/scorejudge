@@ -10,7 +10,8 @@ export async function GET() {
     try {
         const now = Date.now();
 
-        // Return cached data if fresh
+        // Return cached data if fresh - TEMPORARILY DISABLED
+        /*
         if (cachedLeaderboard && (now - cacheTimestamp) < CACHE_DURATION) {
             return NextResponse.json({
                 leaderboard: cachedLeaderboard,
@@ -18,6 +19,7 @@ export async function GET() {
                 cacheAge: Math.round((now - cacheTimestamp) / 1000),
             });
         }
+        */
 
         // Fetch fresh data
         const leaderboard = await getGlobalLeaderboard();

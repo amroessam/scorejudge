@@ -511,11 +511,13 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             id,
             game_players(
                 score,
-                user:users(id, email, name, display_name, image)
+                user:users!user_id(id, email, name, display_name, image)
             ),
-            rounds(state)
+            rounds!inner(state)
         `)
-        .order('created_at', { ascending: false });
+        .eq('rounds.state', 'COMPLETED')
+        .order('created_at', { ascending: false })
+        .range(0, 3000);
 
     if (error || !games) {
         console.error('Error fetching games for leaderboard:', error);
