@@ -71,7 +71,7 @@ export function GlobalLeaderboard() {
             {/* Leaderboard Table */}
             <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-lg">
                 {/* Table Header */}
-                <div className="grid grid-cols-[28px_1fr_32px_32px_36px_28px_44px] gap-1 px-3 py-2 bg-[var(--muted)]/30 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
+                <div className="grid grid-cols-[24px_1fr_28px_28px_32px_24px_36px] gap-0.5 px-2 py-2 bg-[var(--muted)]/30 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
                     <div className="text-center">#</div>
                     <div>Player</div>
                     <div className="text-center">G</div>
@@ -86,7 +86,7 @@ export function GlobalLeaderboard() {
                     {leaderboard.slice(0, 10).map((player, index) => (
                         <div
                             key={player.email}
-                            className={`grid grid-cols-[28px_1fr_32px_32px_36px_28px_44px] gap-1 px-3 py-2.5 items-center transition-colors ${index === 0
+                            className={`grid grid-cols-[24px_1fr_28px_28px_32px_24px_36px] gap-0.5 px-2 py-2.5 items-center transition-colors ${index === 0
                                 ? "bg-yellow-500/10"
                                 : index === 1
                                     ? "bg-gray-400/10"
@@ -103,7 +103,7 @@ export function GlobalLeaderboard() {
                             </div>
 
                             {/* Player */}
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
                                 <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center border border-[var(--border)]/50">
                                     <Image
                                         src={getAvatarUrl(player.image)}
@@ -114,9 +114,9 @@ export function GlobalLeaderboard() {
                                         unoptimized={getAvatarUrl(player.image).startsWith('data:')}
                                     />
                                 </div>
-                                <div className="flex items-center gap-1 min-w-0">
+                                <div className="flex items-center gap-1 min-w-0 flex-wrap">
                                     {index === 0 && <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />}
-                                    <span className={`text-sm font-medium ${index === 0 ? "text-yellow-500" : "text-[var(--foreground)]"}`}>
+                                    <span className={`text-sm font-medium break-words ${index === 0 ? "text-yellow-500" : "text-[var(--foreground)]"}`}>
                                         {player.name}
                                     </span>
                                 </div>
