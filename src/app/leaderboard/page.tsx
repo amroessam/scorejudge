@@ -202,7 +202,7 @@ export default function LeaderboardPage() {
                             <div className="text-center">W</div>
                             <div className="text-center">%</div>
                             <div className="text-center">🌈</div>
-                            <div className="text-center">GAY_METER</div>
+                            <div className="text-center">🌈%</div>
                         </div>
 
                         {/* Table Body */}
@@ -257,7 +257,7 @@ export default function LeaderboardPage() {
                                         {player.lastPlaceCount > 0 ? player.lastPlaceCount : "-"}
                                     </div>
 
-                                    {/* GAY_METER */}
+                                    {/* 🌈% */}
                                     <div className="text-center text-sm text-pink-500">
                                         {player.gamesPlayed > 0 ? Math.round(player.lastPlaceCount / player.gamesPlayed * 100) : 0}%
                                     </div>
