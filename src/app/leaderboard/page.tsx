@@ -195,14 +195,14 @@ export default function LeaderboardPage() {
                     {/* Leaderboard Table */}
                     <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-lg">
                         {/* Table Header */}
-                        <div className="grid grid-cols-[32px_1fr_40px_40px_44px_32px_40px] gap-1 px-3 py-2 bg-[var(--muted)]/30 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
+                        <div className="grid grid-cols-[32px_1fr_40px_40px_44px_32px_60px] gap-1 px-3 py-2 bg-[var(--muted)]/30 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
                             <div className="text-center">#</div>
                             <div>Player</div>
                             <div className="text-center">G</div>
                             <div className="text-center">W</div>
                             <div className="text-center">%</div>
                             <div className="text-center">🌈</div>
-                            <div className="text-center">L%</div>
+                            <div className="text-center">GAY_METER</div>
                         </div>
 
                         {/* Table Body */}
@@ -211,7 +211,7 @@ export default function LeaderboardPage() {
                                 <button
                                     key={player.email}
                                     onClick={() => setSelectedPlayer(player)}
-                                    className={`w-full grid grid-cols-[32px_1fr_40px_40px_44px_32px_40px] gap-1 px-3 py-2.5 items-center transition-colors hover:bg-white/5 text-left ${index === 0 ? "bg-yellow-500/10" :
+                                    className={`w-full grid grid-cols-[32px_1fr_40px_40px_44px_32px_60px] gap-1 px-3 py-2.5 items-center transition-colors hover:bg-white/5 text-left ${index === 0 ? "bg-yellow-500/10" :
                                         index === 1 ? "bg-gray-400/10" :
                                             index === 2 ? "bg-orange-600/10" : ""
                                         }`}
@@ -257,7 +257,7 @@ export default function LeaderboardPage() {
                                         {player.lastPlaceCount > 0 ? player.lastPlaceCount : "-"}
                                     </div>
 
-                                    {/* L% */}
+                                    {/* GAY_METER */}
                                     <div className="text-center text-sm text-pink-500">
                                         {player.gamesPlayed > 0 ? Math.round(player.lastPlaceCount / player.gamesPlayed * 100) : 0}%
                                     </div>
