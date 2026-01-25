@@ -71,13 +71,14 @@ export function GlobalLeaderboard() {
             {/* Leaderboard Table */}
             <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-lg">
                 {/* Table Header */}
-                <div className="grid grid-cols-[40px_1fr_50px_50px_50px_40px] gap-2 px-4 py-3 bg-[var(--muted)]/30 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
+                <div className="grid grid-cols-[32px_1fr_40px_40px_44px_32px_40px] gap-1 px-3 py-2 bg-[var(--muted)]/30 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
                     <div className="text-center">#</div>
                     <div>Player</div>
-                    <div className="text-center">Games</div>
-                    <div className="text-center">Wins</div>
+                    <div className="text-center">G</div>
+                    <div className="text-center">W</div>
                     <div className="text-center">%</div>
                     <div className="text-center">🌈</div>
+                    <div className="text-center">L%</div>
                 </div>
 
                 {/* Table Body */}
@@ -85,7 +86,7 @@ export function GlobalLeaderboard() {
                     {leaderboard.slice(0, 10).map((player, index) => (
                         <div
                             key={player.email}
-                            className={`grid grid-cols-[40px_1fr_50px_50px_50px_40px] gap-2 px-4 py-3 items-center transition-colors ${index === 0
+                            className={`grid grid-cols-[32px_1fr_40px_40px_44px_32px_40px] gap-1 px-3 py-2.5 items-center transition-colors ${index === 0
                                 ? "bg-yellow-500/10"
                                 : index === 1
                                     ? "bg-gray-400/10"
@@ -95,44 +96,27 @@ export function GlobalLeaderboard() {
                                 }`}
                         >
                             {/* Rank */}
-                            <div className="text-center text-lg">
-                                {index === 0 ? (
-                                    "🥇"
-                                ) : index === 1 ? (
-                                    "🥈"
-                                ) : index === 2 ? (
-                                    "🥉"
-                                ) : (
-                                    <span className="text-[var(--muted-foreground)] font-medium">
-                                        {index + 1}
-                                    </span>
+                            <div className="text-center text-base">
+                                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : (
+                                    <span className="text-[var(--muted-foreground)] text-sm font-medium">{index + 1}</span>
                                 )}
                             </div>
 
                             {/* Player */}
-                            <div className="flex items-center gap-2 min-w-0">
-                                {/* Avatar */}
-                                <div className="w-8 h-8 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center border border-[var(--border)]/50">
+                            <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                                <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center border border-[var(--border)]/50">
                                     <Image
                                         src={getAvatarUrl(player.image)}
                                         alt={player.name}
-                                        width={32}
-                                        height={32}
+                                        width={24}
+                                        height={24}
                                         className="object-cover"
                                         unoptimized={getAvatarUrl(player.image).startsWith('data:')}
                                     />
                                 </div>
-                                {/* Name + Crown for #1 */}
                                 <div className="flex items-center gap-1 min-w-0">
-                                    {index === 0 && (
-                                        <Crown className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                                    )}
-                                    <span
-                                        className={`truncate text-sm font-medium ${index === 0
-                                            ? "text-yellow-500"
-                                            : "text-[var(--foreground)]"
-                                            }`}
-                                    >
+                                    {index === 0 && <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />}
+                                    <span className={`text-sm font-medium ${index === 0 ? "text-yellow-500" : "text-[var(--foreground)]"}`}>
                                         {player.name}
                                     </span>
                                 </div>
@@ -156,6 +140,11 @@ export function GlobalLeaderboard() {
                             {/* 🌈 Count */}
                             <div className="text-center text-sm text-pink-500 font-medium">
                                 {player.lastPlaceCount > 0 ? player.lastPlaceCount : "-"}
+                            </div>
+
+                            {/* L% */}
+                            <div className="text-center text-sm text-pink-500">
+                                {player.gamesPlayed > 0 ? Math.round(player.lastPlaceCount / player.gamesPlayed * 100) : 0}%
                             </div>
                         </div>
                     ))}
