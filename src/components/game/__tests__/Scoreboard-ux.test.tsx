@@ -24,7 +24,7 @@ describe('Scoreboard - UX Enhancements', () => {
     });
 
     const createPlayer = (id: string, name: string, email: string, score: number): Player => ({
-        id, name, email, score, tricks: 0, bid: 0
+        id, name, email, score, tricks: 0, bid: 0, playerOrder: parseInt(id) - 1
     });
 
     it('should show Momentum Glow (Fire) for 3+ win streak', () => {

@@ -31,9 +31,9 @@ describe('Scoreboard', () => {
     id: 'game1',
     name: 'Test Game',
     players: [
-      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 10, image: 'https://lh3.googleusercontent.com/a/test-photo.jpg' },
-      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 5 },
-      { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 8 },
+      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 10, image: 'https://lh3.googleusercontent.com/a/test-photo.jpg', playerOrder: 0 },
+      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 5, playerOrder: 1 },
+      { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 8, playerOrder: 2 },
     ],
     rounds: [
       {
@@ -133,10 +133,10 @@ describe('Scoreboard', () => {
       ...mockGameState,
       currentRoundIndex: 2, // Round 2 - medals should show
       players: [
-        { id: '1', name: 'First', email: 'p1@test.com', score: 100 },
-        { id: '2', name: 'Second', email: 'p2@test.com', score: 80 },
-        { id: '3', name: 'Third', email: 'p3@test.com', score: 60 },
-        { id: '4', name: 'Fourth', email: 'p4@test.com', score: 40 },
+        { id: '1', name: 'First', email: 'p1@test.com', score: 100, tricks: 0, bid: 0, playerOrder: 0 },
+        { id: '2', name: 'Second', email: 'p2@test.com', score: 80, tricks: 0, bid: 0, playerOrder: 1 },
+        { id: '3', name: 'Third', email: 'p3@test.com', score: 60, tricks: 0, bid: 0, playerOrder: 2 },
+        { id: '4', name: 'Fourth', email: 'p4@test.com', score: 40, tricks: 0, bid: 0, playerOrder: 3 },
       ],
       rounds: [
         { index: 1, cards: 5, trump: 'S', state: 'COMPLETED', bids: {}, tricks: {} },
@@ -158,9 +158,9 @@ describe('Scoreboard', () => {
       ...mockGameState,
       currentRoundIndex: 1, // Round 1 - no medals
       players: [
-        { id: '1', name: 'First', email: 'p1@test.com', score: 0 },
-        { id: '2', name: 'Second', email: 'p2@test.com', score: 0 },
-        { id: '3', name: 'Third', email: 'p3@test.com', score: 0 },
+        { id: '1', name: 'First', email: 'p1@test.com', score: 0, tricks: 0, bid: 0, playerOrder: 0 },
+        { id: '2', name: 'Second', email: 'p2@test.com', score: 0, tricks: 0, bid: 0, playerOrder: 1 },
+        { id: '3', name: 'Third', email: 'p3@test.com', score: 0, tricks: 0, bid: 0, playerOrder: 2 },
       ],
       rounds: [{ index: 1, cards: 5, trump: 'S', state: 'BIDDING', bids: {}, tricks: {} }],
     };
@@ -179,9 +179,9 @@ describe('Scoreboard', () => {
       ...mockGameState,
       currentRoundIndex: 2, // Round 2
       players: [
-        { id: '1', name: 'First', email: 'p1@test.com', score: 100 },
-        { id: '2', name: 'Second', email: 'p2@test.com', score: 80 },
-        { id: '3', name: 'Third', email: 'p3@test.com', score: 60 },
+        { id: '1', name: 'First', email: 'p1@test.com', score: 100, tricks: 0, bid: 0, playerOrder: 0 },
+        { id: '2', name: 'Second', email: 'p2@test.com', score: 80, tricks: 0, bid: 0, playerOrder: 1 },
+        { id: '3', name: 'Third', email: 'p3@test.com', score: 60, tricks: 0, bid: 0, playerOrder: 2 },
       ],
       rounds: [
         { index: 1, cards: 5, trump: 'S', state: 'COMPLETED', bids: {}, tricks: {} },
@@ -203,7 +203,7 @@ describe('Scoreboard', () => {
     const manyRoundsGameState = {
       ...mockGameState,
       players: [
-        { id: '1', name: 'Player 1', email: 'p1@test.com', score: 100 },
+        { id: '1', name: 'Player 1', email: 'p1@test.com', score: 100, tricks: 0, bid: 0, playerOrder: 0 },
       ],
       rounds: Array.from({ length: 15 }, (_, i) => ({
         index: i + 1,

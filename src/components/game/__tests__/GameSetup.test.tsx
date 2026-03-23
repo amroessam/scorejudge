@@ -44,9 +44,9 @@ describe('GameSetup', () => {
     id: 'game1',
     name: 'Test Game',
     players: [
-      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, image: 'old-image.jpg' },
-      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
-      { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, image: 'old-image.jpg', playerOrder: 0 },
+      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+      { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
     ],
     rounds: [],
     currentRoundIndex: 0,

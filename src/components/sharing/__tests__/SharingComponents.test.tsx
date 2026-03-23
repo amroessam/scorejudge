@@ -65,6 +65,7 @@ describe('Sharing Components', () => {
                 score: 150,
                 bid: 0,
                 tricks: 0,
+                playerOrder: 0,
             },
             {
                 id: '2',
@@ -73,6 +74,7 @@ describe('Sharing Components', () => {
                 score: 50,
                 bid: 0,
                 tricks: 0,
+                playerOrder: 1,
             }
         ];
 

@@ -2,6 +2,7 @@ import { calculatePredictions, formatBidHint, PredictionHints } from '../predict
 import { Player } from '../store';
 
 // Helper to create test players
+let _playerOrderCounter = 0;
 function createPlayer(name: string, email: string, score: number): Player {
     return {
         id: email,
@@ -10,6 +11,7 @@ function createPlayer(name: string, email: string, score: number): Player {
         score,
         bid: 0,
         tricks: 0,
+        playerOrder: _playerOrderCounter++,
     };
 }
 
