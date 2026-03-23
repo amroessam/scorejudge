@@ -21,19 +21,34 @@ export function getCountryFromHeaders(headers: Headers): string | null {
 }
 
 /**
+ * Check if an IP is a private/internal address (not geolocatable).
+ */
+function isPrivateIp(ip: string): boolean {
+    return ip === '127.0.0.1' || ip === '::1' ||
+        ip.startsWith('10.') ||
+        ip.startsWith('172.16.') || ip.startsWith('172.17.') || ip.startsWith('172.18.') ||
+        ip.startsWith('172.19.') || ip.startsWith('172.2') || ip.startsWith('172.3') ||
+        ip.startsWith('192.168.');
+}
+
+/**
  * Get client IP from request headers.
- * Checks common proxy headers in priority order.
+ * Checks Cloudflare, then common proxy headers in priority order.
  */
 function getClientIp(headers: Headers): string | null {
+    // Cloudflare sends the real client IP in CF-Connecting-IP
+    const cfIp = headers.get('CF-Connecting-IP');
+    if (cfIp && !isPrivateIp(cfIp)) return cfIp;
+
     // X-Forwarded-For can contain multiple IPs: client, proxy1, proxy2
     const forwarded = headers.get('X-Forwarded-For');
     if (forwarded) {
         const firstIp = forwarded.split(',')[0].trim();
-        if (firstIp && firstIp !== '127.0.0.1' && firstIp !== '::1') return firstIp;
+        if (firstIp && !isPrivateIp(firstIp)) return firstIp;
     }
 
     const realIp = headers.get('X-Real-IP');
-    if (realIp && realIp !== '127.0.0.1' && realIp !== '::1') return realIp;
+    if (realIp && !isPrivateIp(realIp)) return realIp;
 
     return null;
 }

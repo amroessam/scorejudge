@@ -182,14 +182,6 @@ export async function POST(req: NextRequest) {
                 span.setAttribute('user.id', user.id);
 
                 // 2. Create game in Supabase (with IP-based country detection)
-                // Debug: log headers to diagnose geolocation
-                const debugHeaders: Record<string, string> = {};
-                ['x-forwarded-for', 'x-real-ip', 'cf-ipcountry', 'cf-connecting-ip', 'true-client-ip', 'x-vercel-ip-country', 'host', 'x-forwarded-proto'].forEach(h => {
-                    const val = req.headers.get(h);
-                    if (val) debugHeaders[h] = val;
-                });
-                log.info({ geoHeaders: debugHeaders }, 'Geolocation debug: incoming headers');
-
                 const countryCode = await getCountryFromRequest(req.headers);
                 const dbGame = await createGame(name, user.id, countryCode);
                 if (!dbGame) {
