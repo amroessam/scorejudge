@@ -35,14 +35,7 @@ interface DiscoverableGame {
     createdAt?: number;
 }
 
-import { DECK_SIZE } from "@/lib/config";
-
-// Helper to calculate final round number
-function getFinalRoundNumber(numPlayers: number): number {
-    if (!numPlayers) return 12; // Default fallback
-    const maxCards = Math.floor(DECK_SIZE / numPlayers);
-    return maxCards * 2 - 1;
-}
+import { getFinalRoundNumber } from "@/lib/game-logic";
 
 export default function Dashboard() {
     const { data: session, status } = useSession();

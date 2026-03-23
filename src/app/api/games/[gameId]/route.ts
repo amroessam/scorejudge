@@ -3,14 +3,8 @@ import { setGame, getGame, removeGame, updateGame as updateMemoryGame } from "@/
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { getGame as getDbGame, updateGame as updateDbGame, deleteGame as deleteDbGame, hideGameForUser, getUserByEmail, removePlayerFromGame } from "@/lib/db";
-import { DECK_SIZE } from "@/lib/config";
 import { withSpan, extractTraceContext } from "@/lib/tracing";
-
-function getFinalRoundNumber(numPlayers: number): number {
-    if (!numPlayers) return 12;
-    const maxCards = Math.floor(DECK_SIZE / numPlayers);
-    return maxCards * 2 - 1;
-}
+import { getFinalRoundNumber } from "@/lib/game-logic";
 
 export async function GET(
     req: NextRequest,

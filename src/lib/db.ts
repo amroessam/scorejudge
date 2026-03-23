@@ -1,7 +1,7 @@
 import { supabaseAdmin } from './supabase';
 import { GameState, Player, Round, removeGame } from './store';
-import { DECK_SIZE } from './config';
 import { createLogger } from './logger';
+import { getFinalRoundNumber } from './game-logic';
 
 const log = createLogger({ module: 'db' });
 
@@ -664,12 +664,6 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         });
 
     return leaderboard;
-}
-
-function getFinalRoundNumber(numPlayers: number): number {
-    if (!numPlayers) return 12;
-    const maxCards = Math.floor(DECK_SIZE / numPlayers);
-    return maxCards * 2 - 1;
 }
 
 /**

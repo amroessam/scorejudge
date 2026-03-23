@@ -14,6 +14,7 @@ import {
 } from "@/lib/db";
 import { createLogger } from "@/lib/logger";
 import { withSpan, extractTraceContext } from "@/lib/tracing";
+import { getFinalRoundNumber } from "@/lib/game-logic";
 
 // Helper to calc round plan
 function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
@@ -25,11 +26,6 @@ function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
     for (let i = 2; i <= maxCards; i++) rounds.push({ cards: i, trump: '' });
 
     return rounds.map((r, i) => ({ ...r, trump: TRUMPS[i % 5] }));
-}
-
-function getFinalRoundNumber(numPlayers: number): number {
-    const maxCards = Math.floor(DECK_SIZE / numPlayers);
-    return maxCards * 2 - 1;
 }
 
 function getDealerIndex(roundIndex: number, numPlayers: number): number {
