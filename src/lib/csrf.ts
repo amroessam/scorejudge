@@ -20,9 +20,8 @@ export function validateCSRF(req: NextRequest): boolean {
     // In production, validate Origin header matches host
     if (process.env.NODE_ENV === 'production') {
         if (!origin && !referer) {
-            // Allow if no origin/referer (e.g., Postman, curl) but log warning
-            console.warn('CSRF: Missing Origin and Referer headers');
-            return true; // Allow for API clients, but could be stricter
+            console.warn('CSRF: Rejecting request with missing Origin and Referer headers');
+            return false;
         }
 
         // Validate origin matches host
