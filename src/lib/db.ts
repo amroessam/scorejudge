@@ -509,166 +509,40 @@ export interface LeaderboardEntry {
 }
 
 export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
-    // OPTIMIZED: Split into separate queries to avoid Supabase statement timeout
-    // The nested join with user images was causing timeouts on free tier
+    // Single RPC call to Postgres function — replaces the old 5-step JS aggregation
+    // that broke due to PostgREST URL length limits on .in() with 200+ game IDs.
+    // The SQL function (sql/get_leaderboard.sql) runs entirely in Postgres:
+    // no .limit(), no .in(), no URL constraints, single network round-trip.
 
-    // Step 1: Get completed game IDs first (fast query)
-    const { data: gamesWithRounds, error: gamesError } = await supabaseAdmin
-        .from('games')
-        .select('id, rounds(state)')
-        .order('created_at', { ascending: false })
-        .limit(500);
+    const { data, error } = await supabaseAdmin.rpc('get_leaderboard');
 
-    if (gamesError || !gamesWithRounds) {
-        console.error('[Leaderboard] Error fetching games:', gamesError);
+    if (error) {
+        log.error({ error: error.message, code: error.code }, 'Error calling get_leaderboard RPC');
         return [];
     }
 
-    // Filter to only completed games
-    const completedGameIds = gamesWithRounds
-        .filter(game => {
-            const rounds = game.rounds as { state: string }[];
-            return rounds && rounds.some(r => r.state === 'COMPLETED');
-        })
-        .map(g => g.id);
-
-    if (completedGameIds.length === 0) {
+    if (!data || !Array.isArray(data)) {
+        log.warn('get_leaderboard RPC returned no data');
         return [];
     }
 
-    // Step 2: Get game_players for completed games (without user join - much faster)
-    const { data: gamePlayers, error: playersError } = await supabaseAdmin
-        .from('game_players')
-        .select('game_id, user_id, score')
-        .in('game_id', completedGameIds);
+    log.info({ playerCount: data.length }, 'Leaderboard fetched via RPC');
 
-    if (playersError || !gamePlayers) {
-        console.error('[Leaderboard] Error fetching game_players:', playersError);
-        return [];
-    }
-
-    // Step 3: Get unique user IDs and fetch users separately
-    const userIds = [...new Set(gamePlayers.map(gp => gp.user_id))];
-
-    const { data: users, error: usersError } = await supabaseAdmin
-        .from('users')
-        .select('id, email, name, display_name, image')
-        .in('id', userIds);
-
-    if (usersError || !users) {
-        console.error('[Leaderboard] Error fetching users:', usersError);
-        return [];
-    }
-
-    // Build user lookup map
-    const userMap = new Map(users.map(u => [u.id, u]));
-
-    // Group game_players by game_id
-    const gamePlayersMap: Record<string, typeof gamePlayers> = {};
-    for (const gp of gamePlayers) {
-        if (!gamePlayersMap[gp.game_id]) {
-            gamePlayersMap[gp.game_id] = [];
-        }
-        gamePlayersMap[gp.game_id].push(gp);
-    }
-
-    log.info({
-        completedGamesCount: completedGameIds.length,
-        totalPlayers: gamePlayers.length,
-        uniqueUsers: users.length
-    }, 'Leaderboard data fetched');
-
-    // Step 4: Aggregate stats per player (by email)
-    const playerStats: Record<string, {
-        email: string;
-        name: string;
-        image: string | null;
-        gamesPlayed: number;
-        wins: number;
-        secondPlace: number;
-        thirdPlace: number;
-        totalScore: number;
-        lastPlaceCount: number;
-        percentileSum: number;
-    }> = {};
-
-    for (const gameId of completedGameIds) {
-        const players = gamePlayersMap[gameId] || [];
-
-        if (players.length < 2) {
-            continue;
-        }
-
-        const numPlayers = players.length;
-        const scores = players.map(gp => gp.score || 0);
-        const distinctScores = [...new Set(scores)].sort((a, b) => b - a);
-        const minScore = Math.min(...scores);
-
-        for (const gp of players) {
-            const user = userMap.get(gp.user_id);
-            if (!user || !user.email) {
-                continue;
-            }
-
-            const email = user.email;
-            const score = gp.score || 0;
-            const rank = distinctScores.indexOf(score) + 1;
-            const percentile = ((numPlayers - rank) / (numPlayers - 1)) * 100;
-
-            if (!playerStats[email]) {
-                const displayName = user.display_name || user.name || email.split('@')[0];
-                playerStats[email] = {
-                    email,
-                    name: displayName,
-                    image: user.image,
-                    gamesPlayed: 0,
-                    wins: 0,
-                    secondPlace: 0,
-                    thirdPlace: 0,
-                    totalScore: 0,
-                    lastPlaceCount: 0,
-                    percentileSum: 0,
-                };
-            }
-
-            playerStats[email].gamesPlayed++;
-            playerStats[email].totalScore += score;
-            playerStats[email].percentileSum += percentile;
-
-            if (rank === 1) playerStats[email].wins++;
-            else if (rank === 2) playerStats[email].secondPlace++;
-            else if (rank === 3) playerStats[email].thirdPlace++;
-
-            if (score === minScore && distinctScores.length > 1) {
-                playerStats[email].lastPlaceCount++;
-            }
-        }
-    }
-
-    // Step 5: Convert to array, calculate rates, filter min 3 games, sort
-    const leaderboard: LeaderboardEntry[] = Object.values(playerStats)
-        .filter(p => p.gamesPlayed >= 3)
-        .map(p => ({
-            email: p.email,
-            name: p.name,
-            image: p.image,
-            gamesPlayed: p.gamesPlayed,
-            wins: p.wins,
-            secondPlace: p.secondPlace,
-            thirdPlace: p.thirdPlace,
-            totalScore: p.totalScore,
-            lastPlaceCount: p.lastPlaceCount,
-            averagePercentile: p.gamesPlayed > 0 ? Math.round(p.percentileSum / p.gamesPlayed) : 0,
-            winRate: p.gamesPlayed > 0 ? Math.round((p.wins / p.gamesPlayed) * 100) : 0,
-            podiumRate: p.gamesPlayed > 0 ? Math.round(((p.wins + p.secondPlace + p.thirdPlace) / p.gamesPlayed) * 100) : 0,
-        }))
-        .sort((a, b) => {
-            if (b.averagePercentile !== a.averagePercentile) return b.averagePercentile - a.averagePercentile;
-            if (b.wins !== a.wins) return b.wins - a.wins;
-            return b.totalScore - a.totalScore;
-        });
-
-    return leaderboard;
+    // Map Postgres snake_case columns to the LeaderboardEntry interface
+    return data.map((row: any) => ({
+        email: row.email,
+        name: row.player_name,
+        image: row.player_image || null,
+        gamesPlayed: Number(row.games_played),
+        wins: Number(row.wins_1st),
+        secondPlace: Number(row.second_place),
+        thirdPlace: Number(row.third_place),
+        averagePercentile: Number(row.avg_percentile),
+        podiumRate: Number(row.podium_rate),
+        winRate: Number(row.win_rate),
+        totalScore: Number(row.total_score),
+        lastPlaceCount: Number(row.last_place),
+    }));
 }
 
 /**
