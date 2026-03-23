@@ -233,9 +233,7 @@ export async function POST(req: NextRequest) {
                 gameLog.info({ playerCount: 1 }, 'Game created successfully');
 
                 // 4. Broadcast discovery update
-                if ((global as any).broadcastDiscoveryUpdate) {
-                    (global as any).broadcastDiscoveryUpdate('GAME_CREATED', initialGameState);
-                }
+                global.broadcastDiscoveryUpdate?.('GAME_CREATED', initialGameState);
 
                 return NextResponse.json({ gameId });
             } catch (e: any) {

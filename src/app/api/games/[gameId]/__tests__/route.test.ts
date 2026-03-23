@@ -36,7 +36,7 @@ describe('/api/games/[gameId] DELETE', () => {
     (validateCSRF as jest.Mock).mockReturnValue(true);
 
     // Mock broadcastDiscoveryUpdate
-    (global as any).broadcastDiscoveryUpdate = jest.fn();
+    global.broadcastDiscoveryUpdate = jest.fn();
   });
 
   const createMockPlayer = (overrides?: Partial<Player>): Player => ({

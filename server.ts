@@ -262,7 +262,7 @@ app.prepare().then(async () => {
     // We can expose a global broadcast function or use an event emitter.
     // Since `server.ts` is the entry point, we can attach to `global`
 
-    (global as any).broadcastGameUpdate = (gameId: string, state: GameState) => {
+    global.broadcastGameUpdate = (gameId: string, state: GameState) => {
         let latestState = getGame(gameId) || state;
         const message = JSON.stringify({ type: 'GAME_UPDATE', state: latestState });
         let sentCount = 0;
@@ -284,7 +284,7 @@ app.prepare().then(async () => {
     };
 
     // Broadcast discovery updates (new games, game updates that affect discoverability)
-    (global as any).broadcastDiscoveryUpdate = (updateType: 'GAME_CREATED' | 'GAME_UPDATED' | 'GAME_DELETED', game: GameState) => {
+    global.broadcastDiscoveryUpdate = (updateType: 'GAME_CREATED' | 'GAME_UPDATED' | 'GAME_DELETED', game: GameState) => {
         const message = JSON.stringify({
             type: 'DISCOVERY_UPDATE',
             updateType,

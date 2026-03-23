@@ -131,8 +131,8 @@ export async function PATCH(
             const updatedGame = updateMemoryGame(gameId, { players, firstDealerEmail });
 
             // Broadcast
-            if (updatedGame && (global as any).broadcastGameUpdate) {
-                (global as any).broadcastGameUpdate(gameId, updatedGame);
+            if (updatedGame) {
+                global.broadcastGameUpdate?.(gameId, updatedGame);
             }
 
             span.setAttribute('update.success', true);
@@ -224,9 +224,7 @@ export async function DELETE(
                             memGame.players = memGame.players.filter(p => p.id !== user.id);
                             setGame(gameId, memGame);
                             // Broadcast update to other players so they see someone left
-                            if ((global as any).broadcastGameUpdate) {
-                                (global as any).broadcastGameUpdate(gameId, memGame);
-                            }
+                            global.broadcastGameUpdate?.(gameId, memGame);
                         }
 
                         return NextResponse.json({ success: true, message: "You have left the game" });
