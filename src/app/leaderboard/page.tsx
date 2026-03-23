@@ -181,28 +181,28 @@ export default function LeaderboardPage() {
             </div>
 
             {/* Title */}
-            <div className="flex items-center justify-center gap-3 mb-6">
-                <Trophy className="w-8 h-8 text-yellow-500" />
-                <h1 className="text-2xl font-bold text-[var(--foreground)]">
-                    Global Leaderboard
+            <div className="flex items-center justify-center gap-3 mb-4">
+                <Trophy className="w-7 h-7 text-yellow-500 drop-shadow-[0_0_6px_rgba(234,179,8,0.4)]" />
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 via-white to-yellow-400 bg-clip-text text-transparent">
+                    {region === 'AE' ? '🇦🇪 UAE Leaderboard' : region === 'PK' ? '🇵🇰 Pakistan Leaderboard' : 'Global Leaderboard'}
                 </h1>
-                <Trophy className="w-8 h-8 text-yellow-500" />
+                <Trophy className="w-7 h-7 text-yellow-500 drop-shadow-[0_0_6px_rgba(234,179,8,0.4)]" />
             </div>
 
             {/* Region Filter Tabs */}
-            <div className="flex gap-2 justify-center mb-6">
+            <div className="flex gap-2 justify-center mb-5">
                 {[
                     { label: 'All', value: undefined as string | undefined },
-                    { label: '\u{1F1E6}\u{1F1EA} UAE', value: 'AE' },
-                    { label: '\u{1F1F5}\u{1F1F0} Pakistan', value: 'PK' },
+                    { label: '🇦🇪 UAE', value: 'AE' },
+                    { label: '🇵🇰 Pakistan', value: 'PK' },
                 ].map((tab) => (
                     <button
                         key={tab.label}
                         onClick={() => setRegion(tab.value)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                             region === tab.value
-                                ? 'bg-[var(--primary)] text-white'
-                                : 'bg-[var(--muted)]/30 text-[var(--muted-foreground)] hover:bg-[var(--muted)]/50'
+                                ? 'bg-[var(--primary)] text-white shadow-[0_0_12px_rgba(99,102,241,0.4)] ring-1 ring-[var(--primary)]/50'
+                                : 'bg-[var(--muted)]/20 text-[var(--muted-foreground)] hover:bg-[var(--muted)]/40 hover:text-[var(--foreground)]'
                         }`}
                     >
                         {tab.label}
@@ -217,9 +217,9 @@ export default function LeaderboardPage() {
             ) : (
                 <div className="max-w-lg mx-auto">
                     {/* Leaderboard Table */}
-                    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-lg">
+                    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)]/50 overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
                         {/* Table Header */}
-                        <div className="grid grid-cols-[32px_1fr_40px_40px_44px_32px] gap-1 px-3 py-2 bg-[var(--muted)]/30 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
+                        <div className="grid grid-cols-[36px_1fr_44px_44px_48px_36px] gap-1 px-3 py-2.5 bg-[var(--muted)]/20 border-b border-[var(--border)]/50 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
                             <div className="text-center">#</div>
                             <div>Player</div>
                             <div className="text-center">G</div>
@@ -238,49 +238,60 @@ export default function LeaderboardPage() {
                                 <button
                                     key={player.email}
                                     onClick={() => setSelectedPlayer(player)}
-                                    className={`w-full grid grid-cols-[32px_1fr_40px_40px_44px_32px] gap-1 px-3 py-2.5 items-center transition-colors hover:bg-white/5 text-left ${index === 0 ? "bg-yellow-500/10" :
-                                        index === 1 ? "bg-gray-400/10" :
-                                            index === 2 ? "bg-orange-600/10" : ""
-                                        }`}
+                                    className={`w-full grid grid-cols-[36px_1fr_44px_44px_48px_36px] gap-1 px-3 py-3 items-center transition-all duration-150 hover:bg-white/[0.06] active:scale-[0.99] text-left ${
+                                        index === 0 ? "bg-gradient-to-r from-yellow-500/15 to-yellow-500/5" :
+                                        index === 1 ? "bg-gradient-to-r from-gray-400/10 to-transparent" :
+                                        index === 2 ? "bg-gradient-to-r from-orange-600/10 to-transparent" : ""
+                                    }`}
                                 >
                                     {/* Rank */}
-                                    <div className="text-center text-base">
+                                    <div className="text-center text-lg">
                                         {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : (
-                                            <span className="text-[var(--muted-foreground)] text-sm font-medium">{index + 1}</span>
+                                            <span className="text-[var(--muted-foreground)] text-sm font-semibold tabular-nums">{index + 1}</span>
                                         )}
                                     </div>
 
                                     {/* Player */}
-                                    <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-                                        <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--muted)] flex-shrink-0 flex items-center justify-center border border-[var(--border)]/50">
+                                    <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
+                                        <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${
+                                            index === 0 ? 'ring-2 ring-yellow-500/50' :
+                                            index === 1 ? 'ring-2 ring-gray-400/40' :
+                                            index === 2 ? 'ring-2 ring-orange-500/40' :
+                                            'ring-1 ring-[var(--border)]/30'
+                                        } bg-[var(--muted)]`}>
                                             <Image
                                                 src={getAvatarUrl(player.image)}
                                                 alt={player.name}
-                                                width={24}
-                                                height={24}
+                                                width={28}
+                                                height={28}
                                                 className="object-cover"
                                                 unoptimized={getAvatarUrl(player.image).startsWith('data:')}
                                             />
                                         </div>
-                                        <div className="flex items-center gap-1 min-w-0">
-                                            {index === 0 && <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />}
-                                            <span className={`text-sm font-medium ${index === 0 ? "text-yellow-500" : "text-[var(--foreground)]"}`}>
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            {index === 0 && <Crown className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0 drop-shadow-[0_0_3px_rgba(234,179,8,0.5)]" />}
+                                            <span className={`text-sm font-medium truncate ${
+                                                index === 0 ? "text-yellow-400" :
+                                                index === 1 ? "text-gray-300" :
+                                                index === 2 ? "text-orange-400" :
+                                                "text-[var(--foreground)]"
+                                            }`}>
                                                 {player.name}
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Games */}
-                                    <div className="text-center text-sm text-[var(--muted-foreground)]">{player.gamesPlayed}</div>
+                                    <div className="text-center text-sm text-[var(--muted-foreground)] tabular-nums">{player.gamesPlayed}</div>
 
                                     {/* Wins */}
-                                    <div className="text-center text-sm font-semibold text-[var(--foreground)]">{player.wins}</div>
+                                    <div className="text-center text-sm font-semibold text-[var(--foreground)] tabular-nums">{player.wins}</div>
 
                                     {/* Win % */}
-                                    <div className="text-center text-sm text-[var(--muted-foreground)]">{player.winRate}%</div>
+                                    <div className="text-center text-sm text-[var(--muted-foreground)] tabular-nums">{player.winRate}%</div>
 
                                     {/* 🌈 */}
-                                    <div className="text-center text-sm text-pink-500 font-medium">
+                                    <div className="text-center text-sm text-pink-400 font-medium tabular-nums">
                                         {player.lastPlaceCount > 0 ? player.lastPlaceCount : "-"}
                                     </div>
                                 </button>
