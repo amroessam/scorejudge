@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
                 span.setAttribute('user.id', user.id);
 
                 // 2. Create game in Supabase (with IP-based country detection)
-                const countryCode = getCountryFromRequest(req.headers);
+                const countryCode = await getCountryFromRequest(req.headers);
                 const dbGame = await createGame(name, user.id, countryCode);
                 if (!dbGame) {
                     log.error('Failed to create game in database');
