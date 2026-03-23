@@ -164,7 +164,7 @@ export function GlobalLeaderboard() {
 
             {/* Footer note */}
             <p className="text-center text-xs text-[var(--muted-foreground)] mt-3">
-                Minimum 3 games to appear on leaderboard
+                Minimum 10 games to appear on leaderboard
             </p>
         </div>
     );

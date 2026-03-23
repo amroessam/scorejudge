@@ -70,6 +70,23 @@ describe('LeaderboardPage', () => {
         });
     });
 
+    it('renders region filter tabs', async () => {
+        const players = generatePlayers(15);
+        global.fetch = jest.fn(() =>
+            Promise.resolve({
+                json: () => Promise.resolve({ leaderboard: players }),
+            })
+        ) as any;
+
+        const { getByText } = render(<LeaderboardPage />);
+
+        await waitFor(() => {
+            expect(getByText('All')).toBeInTheDocument();
+            expect(getByText(/UAE/)).toBeInTheDocument();
+            expect(getByText(/Pakistan/)).toBeInTheDocument();
+        });
+    });
+
     it('has a scrollable container for the leaderboard rows', async () => {
         const players = generatePlayers(20);
         global.fetch = jest.fn(() =>

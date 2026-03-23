@@ -30,11 +30,14 @@ export default function LeaderboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [isSharing, setIsSharing] = useState(false);
     const [selectedPlayer, setSelectedPlayer] = useState<LeaderboardEntry | null>(null);
+    const [region, setRegion] = useState<string | undefined>(undefined);
 
     const leaderboardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        fetch("/api/leaderboard")
+        setLoading(true);
+        const url = region ? `/api/leaderboard?country=${region}` : '/api/leaderboard';
+        fetch(url)
             .then((res) => res.json())
             .then((data) => {
                 if (data.leaderboard) {
@@ -47,7 +50,7 @@ export default function LeaderboardPage() {
                 setError("Failed to load leaderboard");
                 setLoading(false);
             });
-    }, []);
+    }, [region]);
 
     const onShare = async () => {
         setIsSharing(true);
@@ -186,6 +189,27 @@ export default function LeaderboardPage() {
                 <Trophy className="w-8 h-8 text-yellow-500" />
             </div>
 
+            {/* Region Filter Tabs */}
+            <div className="flex gap-2 justify-center mb-6">
+                {[
+                    { label: 'All', value: undefined as string | undefined },
+                    { label: '\u{1F1E6}\u{1F1EA} UAE', value: 'AE' },
+                    { label: '\u{1F1F5}\u{1F1F0} Pakistan', value: 'PK' },
+                ].map((tab) => (
+                    <button
+                        key={tab.label}
+                        onClick={() => setRegion(tab.value)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                            region === tab.value
+                                ? 'bg-[var(--primary)] text-white'
+                                : 'bg-[var(--muted)]/30 text-[var(--muted-foreground)] hover:bg-[var(--muted)]/50'
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
             {error || leaderboard.length === 0 ? (
                 <div className="max-w-lg mx-auto text-center text-[var(--muted-foreground)] py-12">
                     {error || "No leaderboard data yet. Play at least 3 games to appear!"}
@@ -265,7 +289,7 @@ export default function LeaderboardPage() {
                     </div>
 
                     <p className="text-center text-xs text-[var(--muted-foreground)] mt-4">
-                        Tap a player to see detailed stats
+                        Tap a player to see detailed stats &bull; Min 10 games to appear
                     </p>
                 </div>
             )}
