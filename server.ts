@@ -10,6 +10,7 @@ import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { getGame, type GameState } from './src/lib/store';
+import { sanitizeGameForBroadcast } from './src/lib/sanitize-broadcast';
 import { getGame as getDbGame, purgeStaleGames } from './src/lib/db';
 import { getToken } from 'next-auth/jwt';
 import { IncomingMessage } from 'http';
@@ -240,7 +241,7 @@ app.prepare().then(async () => {
         if (state) {
             span.setAttribute('game.found', true);
             span.setAttribute('game.name', state.name);
-            ws.send(JSON.stringify({ type: 'GAME_UPDATE', state }));
+            ws.send(JSON.stringify({ type: 'GAME_UPDATE', state: sanitizeGameForBroadcast(state) }));
         } else {
             span.setAttribute('game.found', false);
             ws.send(JSON.stringify({ type: 'ERROR', message: 'Game not loaded in memory. Visit page to load.' }));
@@ -264,7 +265,8 @@ app.prepare().then(async () => {
 
     global.broadcastGameUpdate = (gameId: string, state: GameState) => {
         let latestState = getGame(gameId) || state;
-        const message = JSON.stringify({ type: 'GAME_UPDATE', state: latestState });
+        const sanitized = sanitizeGameForBroadcast(latestState);
+        const message = JSON.stringify({ type: 'GAME_UPDATE', state: sanitized });
         let sentCount = 0;
 
         console.log(`[Broadcast] Broadcasting update for gameId=${gameId}, connectedClients=${clients.size}`);
