@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getGlobalLeaderboard, LeaderboardEntry } from '@/lib/db';
 
-// Cache the leaderboard for 5 minutes
+// Force Next.js to treat this route as dynamic (not statically cached)
+export const dynamic = 'force-dynamic';
+
+// In-memory cache: 30 seconds TTL
 let cachedLeaderboard: LeaderboardEntry[] | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes (previously 30 seconds)
+const CACHE_DURATION = 30 * 1000; // 30 seconds
 
 export async function GET() {
     try {
         const now = Date.now();
 
-        // Return cached data if fresh - TEMPORARILY DISABLED
-        /*
+        // Return cached data if fresh
         if (cachedLeaderboard && (now - cacheTimestamp) < CACHE_DURATION) {
             return NextResponse.json({
                 leaderboard: cachedLeaderboard,
@@ -19,7 +21,6 @@ export async function GET() {
                 cacheAge: Math.round((now - cacheTimestamp) / 1000),
             });
         }
-        */
 
         // Fetch fresh data
         const leaderboard = await getGlobalLeaderboard();
