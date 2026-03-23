@@ -132,7 +132,7 @@ describe('store', () => {
         id: 'game1',
         name: 'Test Game',
         players: [
-          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
+          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
         ],
         rounds: [],
         currentRoundIndex: 0,
@@ -186,7 +186,7 @@ describe('store', () => {
         id: 'game1',
         name: 'Test Game',
         players: [
-          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
+          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
         ],
         rounds: [],
         currentRoundIndex: 0,
@@ -198,8 +198,8 @@ describe('store', () => {
       setGame('game1', gameState);
 
       const newPlayers = [
-        { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 10 },
-        { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 5 },
+        { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 10, playerOrder: 0 },
+        { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 5, playerOrder: 1 },
       ];
 
       const updated = updateGame('game1', { players: newPlayers });
@@ -273,7 +273,7 @@ describe('store', () => {
         id: 'game1',
         name: 'Test Game',
         players: [
-          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
+          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
         ],
         rounds: [],
         currentRoundIndex: 0,
@@ -322,8 +322,8 @@ describe('store', () => {
         id: 'game1',
         name: 'Test Game',
         players: [
-          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-          { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
+          { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+          { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
         ],
         rounds: [],
         currentRoundIndex: 0,

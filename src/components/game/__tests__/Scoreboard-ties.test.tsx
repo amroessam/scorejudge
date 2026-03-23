@@ -22,9 +22,9 @@ describe('Scoreboard - Tie Handling', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'Winner 1', email: 'w1@test.com', tricks: 0, bid: 0, score: 100 },
-                { id: '2', name: 'Winner 2', email: 'w2@test.com', tricks: 0, bid: 0, score: 100 },
-                { id: '3', name: 'Loser', email: 'l@test.com', tricks: 0, bid: 0, score: 50 },
+                { id: '1', name: 'Winner 1', email: 'w1@test.com', tricks: 0, bid: 0, score: 100, playerOrder: 0 },
+                { id: '2', name: 'Winner 2', email: 'w2@test.com', tricks: 0, bid: 0, score: 100, playerOrder: 1 },
+                { id: '3', name: 'Loser', email: 'l@test.com', tricks: 0, bid: 0, score: 50, playerOrder: 2 },
             ],
             rounds: [
                 { index: 1, cards: 1, trump: 'S', state: 'COMPLETED', bids: {}, tricks: {} },
@@ -60,9 +60,9 @@ describe('Scoreboard - Tie Handling', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'Winner', email: 'w@test.com', tricks: 0, bid: 0, score: 100 },
-                { id: '2', name: 'Loser 1', email: 'l1@test.com', tricks: 0, bid: 0, score: 50 },
-                { id: '3', name: 'Loser 2', email: 'l2@test.com', tricks: 0, bid: 0, score: 50 },
+                { id: '1', name: 'Winner', email: 'w@test.com', tricks: 0, bid: 0, score: 100, playerOrder: 0 },
+                { id: '2', name: 'Loser 1', email: 'l1@test.com', tricks: 0, bid: 0, score: 50, playerOrder: 1 },
+                { id: '3', name: 'Loser 2', email: 'l2@test.com', tricks: 0, bid: 0, score: 50, playerOrder: 2 },
             ],
             rounds: [
                 { index: 1, cards: 1, trump: 'S', state: 'COMPLETED', bids: {}, tricks: {} },
@@ -98,10 +98,10 @@ describe('Scoreboard - Tie Handling', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'P1', email: 'p1@test.com', tricks: 0, bid: 0, score: 100 },
-                { id: '2', name: 'P2', email: 'p2@test.com', tricks: 0, bid: 0, score: 100 },
-                { id: '3', name: 'P3', email: 'p3@test.com', tricks: 0, bid: 0, score: 99 },
-                { id: '4', name: 'P4', email: 'p4@test.com', tricks: 0, bid: 0, score: 98 },
+                { id: '1', name: 'P1', email: 'p1@test.com', tricks: 0, bid: 0, score: 100, playerOrder: 0 },
+                { id: '2', name: 'P2', email: 'p2@test.com', tricks: 0, bid: 0, score: 100, playerOrder: 1 },
+                { id: '3', name: 'P3', email: 'p3@test.com', tricks: 0, bid: 0, score: 99, playerOrder: 2 },
+                { id: '4', name: 'P4', email: 'p4@test.com', tricks: 0, bid: 0, score: 98, playerOrder: 3 },
             ],
             rounds: [
                 { index: 1, cards: 1, trump: 'S', state: 'COMPLETED', bids: {}, tricks: {} },

@@ -10,9 +10,9 @@ describe('RoundControls', () => {
     id: 'game1',
     name: 'Test Game',
     players: [
-      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
-      { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+      { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
     ],
     rounds: [],
     currentRoundIndex: 0,
@@ -334,9 +334,9 @@ describe('RoundControls', () => {
     const gameStateEnded = {
       ...mockGameState,
       players: [
-        { id: '1', name: 'Winner', email: 'p1@test.com', tricks: 0, bid: 0, score: 100 },
-        { id: '2', name: 'Second', email: 'p2@test.com', tricks: 0, bid: 0, score: 80 },
-        { id: '3', name: 'Third', email: 'p3@test.com', tricks: 0, bid: 0, score: 60 },
+        { id: '1', name: 'Winner', email: 'p1@test.com', tricks: 0, bid: 0, score: 100, playerOrder: 0 },
+        { id: '2', name: 'Second', email: 'p2@test.com', tricks: 0, bid: 0, score: 80, playerOrder: 1 },
+        { id: '3', name: 'Third', email: 'p3@test.com', tricks: 0, bid: 0, score: 60, playerOrder: 2 },
       ],
       rounds: Array.from({ length: 33 }, (_, i) => ({
         index: i + 1,

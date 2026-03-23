@@ -10,8 +10,8 @@ describe('ScoreEntryOverlay - Bid Input Handling', () => {
     id: 'game1',
     name: 'Test Game',
     players: [
-      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
+      { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+      { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
     ],
     rounds: [
       {

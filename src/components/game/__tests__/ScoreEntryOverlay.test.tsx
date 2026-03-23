@@ -10,10 +10,10 @@ describe('ScoreEntryOverlay - Dealer Bid Hint', () => {
         id: 'game1',
         name: 'Test Game',
         players: [
-            { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-            { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
-            { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
-            { id: '4', name: 'Dealer', email: 'dealer@test.com', tricks: 0, bid: 0, score: 0 },
+            { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+            { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+            { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
+            { id: '4', name: 'Dealer', email: 'dealer@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 3 },
         ],
         rounds: [
             {
@@ -96,9 +96,9 @@ describe('ScoreEntryOverlay - Game End', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 10 },
-                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 5 },
-                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 8 },
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 10, playerOrder: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 5, playerOrder: 1 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 8, playerOrder: 2 },
             ],
             rounds: [
                 {
@@ -220,9 +220,9 @@ describe('ScoreEntryOverlay - Trick Validation for Zero Bids', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
             ],
             rounds: [
                 {
@@ -280,9 +280,9 @@ describe('ScoreEntryOverlay - Trick Validation for Zero Bids', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
             ],
             rounds: [
                 {
@@ -340,9 +340,9 @@ describe('ScoreEntryOverlay - Trick Validation for Zero Bids', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
             ],
             rounds: [
                 {
@@ -407,9 +407,9 @@ describe('ScoreEntryOverlay - Trick Validation for Zero Bids', () => {
             id: 'game1',
             name: 'Test Game',
             players: [
-                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0 },
-                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0 },
+                { id: '1', name: 'Player 1', email: 'p1@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 0 },
+                { id: '2', name: 'Player 2', email: 'p2@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 1 },
+                { id: '3', name: 'Player 3', email: 'p3@test.com', tricks: 0, bid: 0, score: 0, playerOrder: 2 },
             ],
             rounds: [
                 {
