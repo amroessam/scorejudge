@@ -219,7 +219,7 @@ export default function LeaderboardPage() {
                     {/* Leaderboard Table */}
                     <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)]/50 overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
                         {/* Table Header */}
-                        <div className="grid grid-cols-[36px_1fr_44px_44px_48px_36px] gap-1 px-3 py-2.5 bg-[var(--muted)]/20 border-b border-[var(--border)]/50 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                        <div className="grid grid-cols-[28px_1fr_36px_36px_40px_28px] gap-1 px-3 py-2.5 bg-[var(--muted)]/20 border-b border-[var(--border)]/50 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
                             <div className="text-center">#</div>
                             <div>Player</div>
                             <div className="text-center">G</div>
@@ -238,7 +238,7 @@ export default function LeaderboardPage() {
                                 <button
                                     key={player.email}
                                     onClick={() => setSelectedPlayer(player)}
-                                    className={`w-full grid grid-cols-[36px_1fr_44px_44px_48px_36px] gap-1 px-3 py-3 items-center transition-all duration-150 hover:bg-white/[0.06] active:scale-[0.99] text-left ${
+                                    className={`w-full grid grid-cols-[28px_1fr_36px_36px_40px_28px] gap-1 px-3 py-3 items-center transition-all duration-150 hover:bg-white/[0.06] active:scale-[0.99] text-left ${
                                         index === 0 ? "bg-gradient-to-r from-yellow-500/15 to-yellow-500/5" :
                                         index === 1 ? "bg-gradient-to-r from-gray-400/10 to-transparent" :
                                         index === 2 ? "bg-gradient-to-r from-orange-600/10 to-transparent" : ""
@@ -252,8 +252,8 @@ export default function LeaderboardPage() {
                                     </div>
 
                                     {/* Player */}
-                                    <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
-                                        <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${
+                                    <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                                        <div className={`w-6 h-6 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${
                                             index === 0 ? 'ring-2 ring-yellow-500/50' :
                                             index === 1 ? 'ring-2 ring-gray-400/40' :
                                             index === 2 ? 'ring-2 ring-orange-500/40' :
@@ -262,8 +262,8 @@ export default function LeaderboardPage() {
                                             <Image
                                                 src={getAvatarUrl(player.image)}
                                                 alt={player.name}
-                                                width={28}
-                                                height={28}
+                                                width={24}
+                                                height={24}
                                                 className="object-cover"
                                                 unoptimized={getAvatarUrl(player.image).startsWith('data:')}
                                             />
@@ -282,16 +282,16 @@ export default function LeaderboardPage() {
                                     </div>
 
                                     {/* Games */}
-                                    <div className="text-center text-sm text-[var(--muted-foreground)] tabular-nums">{player.gamesPlayed}</div>
+                                    <div className="text-center text-xs text-[var(--muted-foreground)] tabular-nums">{player.gamesPlayed}</div>
 
                                     {/* Wins */}
-                                    <div className="text-center text-sm font-semibold text-[var(--foreground)] tabular-nums">{player.wins}</div>
+                                    <div className="text-center text-xs font-semibold text-[var(--foreground)] tabular-nums">{player.wins}</div>
 
                                     {/* Win % */}
-                                    <div className="text-center text-sm text-[var(--muted-foreground)] tabular-nums">{player.winRate}%</div>
+                                    <div className="text-center text-xs text-[var(--muted-foreground)] tabular-nums">{player.winRate}%</div>
 
                                     {/* 🌈 */}
-                                    <div className="text-center text-sm text-pink-400 font-medium tabular-nums">
+                                    <div className="text-center text-xs text-pink-400 font-medium tabular-nums">
                                         {player.lastPlaceCount > 0 ? player.lastPlaceCount : "-"}
                                     </div>
                                 </button>
