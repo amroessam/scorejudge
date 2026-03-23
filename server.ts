@@ -179,6 +179,21 @@ app.prepare().then(async () => {
     const discoveryClients = new Set<WebSocket>(); // Clients listening for discovery updates
 
     wss.on('connection', async (ws, req) => {
+        // Heartbeat: detect stale connections
+        let isAlive = true;
+
+        ws.on('pong', () => { isAlive = true; });
+
+        const pingTimer = setInterval(() => {
+            if (!isAlive) {
+                clearInterval(pingTimer);
+                ws.terminate();
+                return;
+            }
+            isAlive = false;
+            ws.ping();
+        }, 30_000); // Ping every 30 seconds
+
         const { query } = parse(req.url || '', true);
         const gameId = query.gameId as string;
         const channel = query.channel as string; // 'discovery' for discovery channel
@@ -203,6 +218,7 @@ app.prepare().then(async () => {
             span.end();
 
             ws.on('close', () => {
+                clearInterval(pingTimer);
                 discoveryClients.delete(ws);
             });
 
@@ -255,6 +271,7 @@ app.prepare().then(async () => {
         });
 
         ws.on('close', () => {
+            clearInterval(pingTimer);
             clients.delete(ws);
         });
     });
