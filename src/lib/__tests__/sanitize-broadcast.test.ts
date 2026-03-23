@@ -53,4 +53,20 @@ describe('sanitizeGameForBroadcast', () => {
         expect(game.players[1].email).toBe('bob@secret.com');
         expect(game.ownerEmail).toBe('alice@secret.com');
     });
+
+    it('handles empty players array without crashing', () => {
+        const game = makeGame();
+        game.players = [];
+        const sanitized = sanitizeGameForBroadcast(game);
+        expect(sanitized.players).toEqual([]);
+        expect(sanitized.ownerEmail).toBe('alice@secret.com');
+    });
+
+    it('handles undefined operatorEmail', () => {
+        const game = makeGame();
+        delete (game as any).operatorEmail;
+        const sanitized = sanitizeGameForBroadcast(game);
+        expect(sanitized.operatorEmail).toBeUndefined();
+        expect(sanitized.players).toHaveLength(2);
+    });
 });

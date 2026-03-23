@@ -310,7 +310,7 @@ app.prepare().then(async () => {
             game: {
                 id: game.id,
                 name: game.name,
-                ownerEmail: game.ownerEmail,
+                ownerName: game.players?.find(p => p.email === game.ownerEmail)?.name || 'Unknown',
                 playerCount: game.players?.length || 0,
                 currentRoundIndex: game.currentRoundIndex,
             }

@@ -6,7 +6,7 @@ declare global {
     // eslint-disable-next-line no-var
     var broadcastGameUpdate: ((gameId: string, state: GameState) => void) | undefined;
     // eslint-disable-next-line no-var
-    var broadcastDiscoveryUpdate: ((updateType: DiscoveryUpdateType, game: any) => void) | undefined;
+    var broadcastDiscoveryUpdate: ((updateType: DiscoveryUpdateType, game: GameState) => void) | undefined;
 }
 
 export {};
