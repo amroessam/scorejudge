@@ -527,8 +527,6 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         })
         .map(g => g.id);
 
-    console.log(`[Leaderboard] Found ${completedGameIds.length} completed games out of ${gamesWithRounds.length}`);
-
     if (completedGameIds.length === 0) {
         return [];
     }
@@ -544,8 +542,6 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         return [];
     }
 
-    console.log(`[Leaderboard] Fetched ${gamePlayers.length} game_player records`);
-
     // Step 3: Get unique user IDs and fetch users separately
     const userIds = [...new Set(gamePlayers.map(gp => gp.user_id))];
 
@@ -558,8 +554,6 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         console.error('[Leaderboard] Error fetching users:', usersError);
         return [];
     }
-
-    console.log(`[Leaderboard] Fetched ${users.length} users`);
 
     // Build user lookup map
     const userMap = new Map(users.map(u => [u.id, u]));
@@ -645,8 +639,6 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
             }
         }
     }
-
-    console.log(`[Leaderboard] Aggregation complete. Found ${Object.keys(playerStats).length} unique players.`);
 
     // Step 5: Convert to array, calculate rates, filter min 3 games, sort
     const leaderboard: LeaderboardEntry[] = Object.values(playerStats)
