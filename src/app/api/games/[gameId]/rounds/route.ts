@@ -16,6 +16,7 @@ import { createLogger } from "@/lib/logger";
 import { withSpan, extractTraceContext } from "@/lib/tracing";
 import { getFinalRoundNumber } from "@/lib/game-logic";
 import { withStateRollback } from "@/lib/state-transaction";
+import { withGameLock } from "@/lib/game-lock";
 
 // Helper to calc round plan
 function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
@@ -69,6 +70,8 @@ export async function POST(
     }
 
     const { gameId } = await params;
+
+    return withGameLock(gameId, async () => {
     const token = await getAuthToken(req);
 
     if (!token) {
@@ -453,9 +456,7 @@ export async function POST(
                 }
 
                 setGame(gameId, game);
-                if ((global as any).broadcastGameUpdate) {
-                    (global as any).broadcastGameUpdate(gameId, game);
-                }
+                global.broadcastGameUpdate?.(gameId, game);
 
                 log.info({
                     action,
@@ -476,4 +477,5 @@ export async function POST(
             }
         }
     );
+    }); // withGameLock
 }
