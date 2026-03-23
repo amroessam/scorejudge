@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Loader2, CheckCircle, PlayCircle, AlertCircle, Spade, Heart, Club, Diamond, Trophy, History, Settings } from "lucide-react";
 import { ProfileSettingsOverlay } from "@/components/dashboard/ProfileSettingsOverlay";
 import { GameCard } from "@/components/dashboard/GameCard";
-import { DiscoverableGameCard } from "@/components/dashboard/DiscoverableGameCard";
+import { DiscoverGamesSection } from "@/components/dashboard/DiscoverGamesSection";
 import { getAvatarUrl } from "@/lib/utils";
 
 interface GameFile {
@@ -383,36 +383,12 @@ export default function Dashboard() {
 
             {/* Dashboard Content - Non-scrolling body, internal scroll for games */}
             <main className="flex-1 overflow-hidden p-4 md:p-6 flex flex-col gap-6 safe-pb">
-                {/* Discover Section - Static height or minimal */}
-                {discoverableGames.length > 0 && (
-                    <section className="shrink-0 max-h-[35%] flex flex-col">
-                        <div className="bg-background/95 backdrop-blur-md py-2 z-10 -mx-2 px-2 shrink-0">
-                            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-600 font-[family-name:var(--font-russo)] uppercase tracking-tight">
-                                Discover Games
-                            </h2>
-                            <p className="text-muted-foreground text-xs font-medium opacity-80">Join games that haven't started yet</p>
-                        </div>
-
-                        {loadingDiscoverable ? (
-                            <div className="flex justify-center py-10 shrink-0">
-                                <Loader2 className="animate-spin text-muted-foreground" size={24} />
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-3 mt-2 overflow-y-auto custom-scrollbar pr-1 pb-2">
-                                {discoverableGames.map((game) => (
-                                    <DiscoverableGameCard
-                                        key={game.id}
-                                        id={game.id}
-                                        name={game.name}
-                                        ownerEmail={game.ownerEmail}
-                                        playerCount={game.playerCount}
-                                        onJoin={handleJoin}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
+                {/* Discover Section */}
+                <DiscoverGamesSection
+                    games={discoverableGames}
+                    loading={loadingDiscoverable}
+                    onJoin={handleJoin}
+                />
 
                 {/* My Games Section - Fills remaining space and scrolls */}
                 <section className="flex-1 min-h-0 flex flex-col gap-4">
