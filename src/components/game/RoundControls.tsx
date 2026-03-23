@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Check, X } from "lucide-react";
-import { DECK_SIZE } from "@/lib/config";
+import { getFinalRoundNumber } from "@/lib/game-logic";
 
 // Helper function to convert trump abbreviation to full text
 function getTrumpFullName(trump: string): string {
@@ -14,13 +14,6 @@ function getTrumpFullName(trump: string): string {
         'NT': 'No Trump'
     };
     return trumpMap[trump] || trump || 'No Trump';
-}
-
-// Helper to calculate final round number
-// Final round = (DECK_SIZE / numberOfPlayers) * 2 - 1 (down: maxCards rounds, up: maxCards-1 rounds)
-function getFinalRoundNumber(numPlayers: number): number {
-    const maxCards = Math.floor(DECK_SIZE / numPlayers);
-    return maxCards * 2 - 1;
 }
 
 export function RoundControls({ gameId, gameState, isOperator, onGameUpdate }: { gameId: string, gameState: any, isOperator: boolean, onGameUpdate?: (game: any) => void }) {

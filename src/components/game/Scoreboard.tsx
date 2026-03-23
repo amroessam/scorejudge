@@ -20,12 +20,12 @@ import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
 import { PredictionHint } from "./PredictionHint";
-import { DECK_SIZE } from "@/lib/config";
 import { ShareableScorecard } from "@/components/sharing/ShareableScorecard";
 import { toBlob } from "html-to-image";
 import { AnimatePresence, motion } from "framer-motion";
 import { getAvatarUrl } from "@/lib/utils";
 import { calculatePredictions } from "@/lib/predictions";
+import { getFinalRoundNumber } from "@/lib/game-logic";
 
 interface ScoreboardProps {
     gameId: string;
@@ -61,12 +61,6 @@ function getTrumpIcon(trump: string) {
     }[trump] || trump;
 
     return <span className={`font-bold ${color}`}>{symbol}</span>;
-}
-
-// Helper to calculate final round number
-function getFinalRoundNumber(numPlayers: number): number {
-    const maxCards = Math.floor(DECK_SIZE / numPlayers);
-    return maxCards * 2 - 1;
 }
 
 // Helper to get position medal/emoji

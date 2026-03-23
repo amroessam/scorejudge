@@ -4,16 +4,10 @@ import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { createGame, getUserByEmail, upsertUser, addPlayer } from "@/lib/db";
 import { supabaseAdmin } from "@/lib/supabase";
-import { DECK_SIZE } from "@/lib/config";
 import { validateGameName } from "@/lib/validation";
+import { getFinalRoundNumber } from "@/lib/game-logic";
 import { withSpan, extractTraceContext } from "@/lib/tracing";
 import { createLogger } from "@/lib/logger";
-
-function getFinalRoundNumber(numPlayers: number): number {
-    if (!numPlayers) return 12;
-    const maxCards = Math.floor(DECK_SIZE / numPlayers);
-    return maxCards * 2 - 1;
-}
 
 // Using Route Handler for data fetching to keep credentials server-side
 export async function GET(req: NextRequest) {
