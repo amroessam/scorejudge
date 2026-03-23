@@ -433,10 +433,15 @@ export async function saveRoundTricks(gameId: string, roundIndex: number, tricks
     }
 
     // 3. Update round state
-    await supabaseAdmin
+    const { error: stateError } = await supabaseAdmin
         .from('rounds')
         .update({ state: 'COMPLETED' })
         .eq('id', round.id);
+
+    if (stateError) {
+        log.error({ roundId: round.id, error: stateError.message }, 'Error updating round state to COMPLETED');
+        return false;
+    }
 
     // 4. Update total scores in game_players
     return saveGamePlayerScores(gameId, players);
