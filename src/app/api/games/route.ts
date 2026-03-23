@@ -5,6 +5,7 @@ import { getAuthToken } from "@/lib/auth-utils";
 import { createGame, getUserByEmail, upsertUser, addPlayer } from "@/lib/db";
 import { supabaseAdmin } from "@/lib/supabase";
 import { DECK_SIZE } from "@/lib/config";
+import { validateGameName } from "@/lib/validation";
 import { withSpan, extractTraceContext } from "@/lib/tracing";
 import { createLogger } from "@/lib/logger";
 
@@ -139,9 +140,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const { name } = body;
-
-    if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    const nameResult = validateGameName(body.name || '');
+    if (!nameResult.valid) {
+        return NextResponse.json({ error: nameResult.error }, { status: 400 });
+    }
+    const name = nameResult.sanitized!;
 
     return withSpan(
         'POST /api/games',
