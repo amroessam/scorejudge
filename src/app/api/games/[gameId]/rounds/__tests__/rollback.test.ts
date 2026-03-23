@@ -100,4 +100,39 @@ describe('Rounds route rollback behavior', () => {
 
         expect(game.players.map(p => p.score)).toEqual(originalScores);
     });
+
+    it('UNDO: game state is unchanged when DB write returns false', async () => {
+        const game = makeTestGame();
+        game.rounds[0].state = 'COMPLETED';
+        game.rounds[0].tricks = { 'a@test.com': 2, 'b@test.com': 1, 'c@test.com': 2 };
+        const originalScores = game.players.map(p => p.score);
+
+        const result = await withStateRollback(game, async (g) => {
+            // Simulate UNDO score subtraction
+            g.players[0].score -= 20;
+            g.rounds[0].state = 'PLAYING';
+            g.rounds[0].tricks = {};
+            return false; // DB failure
+        });
+
+        expect(result).toBe(false);
+        expect(game.players.map(p => p.score)).toEqual(originalScores);
+        expect(game.rounds[0].state).toBe('COMPLETED');
+    });
+
+    it('START: game state is unchanged when initializeRounds fails', async () => {
+        const game = makeTestGame();
+        game.rounds = [];
+        game.currentRoundIndex = 0;
+
+        const result = await withStateRollback(game, async (g) => {
+            g.rounds = [{ index: 1, cards: 5, trump: 'hearts', state: 'BIDDING' as const, bids: {}, tricks: {} }];
+            g.currentRoundIndex = 1;
+            return false; // DB failure
+        });
+
+        expect(result).toBe(false);
+        expect(game.rounds).toEqual([]);
+        expect(game.currentRoundIndex).toBe(0);
+    });
 });
