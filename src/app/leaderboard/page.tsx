@@ -212,7 +212,7 @@ export default function LeaderboardPage() {
 
             {error || leaderboard.length === 0 ? (
                 <div className="max-w-lg mx-auto text-center text-[var(--muted-foreground)] py-12">
-                    {error || "No leaderboard data yet. Play at least 3 games to appear!"}
+                    {error || "No leaderboard data yet. Play at least 10 games to appear!"}
                 </div>
             ) : (
                 <div className="max-w-lg mx-auto">
@@ -231,8 +231,8 @@ export default function LeaderboardPage() {
                         {/* Table Body — scrollable */}
                         <div
                             data-testid="leaderboard-scroll"
-                            className="divide-y divide-[var(--border)] max-h-[70vh] overflow-y-auto"
-                            style={{ WebkitOverflowScrolling: 'touch' }}
+                            className="divide-y divide-[var(--border)] overflow-y-auto overscroll-contain"
+                            style={{ maxHeight: 'calc(100vh - 280px)', WebkitOverflowScrolling: 'touch' }}
                         >
                             {leaderboard.map((player, index) => (
                                 <button
