@@ -204,8 +204,12 @@ export default function LeaderboardPage() {
                             <div className="text-center">🌈</div>
                         </div>
 
-                        {/* Table Body */}
-                        <div className="divide-y divide-[var(--border)]">
+                        {/* Table Body — scrollable */}
+                        <div
+                            data-testid="leaderboard-scroll"
+                            className="divide-y divide-[var(--border)] max-h-[70vh] overflow-y-auto"
+                            style={{ WebkitOverflowScrolling: 'touch' }}
+                        >
                             {leaderboard.map((player, index) => (
                                 <button
                                     key={player.email}
