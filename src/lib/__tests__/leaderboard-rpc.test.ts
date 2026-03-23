@@ -22,12 +22,12 @@ describe('getGlobalLeaderboard (RPC-based)', () => {
         jest.clearAllMocks();
     });
 
-    it('calls supabaseAdmin.rpc with "get_leaderboard"', async () => {
+    it('calls supabaseAdmin.rpc with "get_leaderboard" and filter_country', async () => {
         mockRpc.mockResolvedValue({ data: [], error: null });
 
         await getGlobalLeaderboard();
 
-        expect(mockRpc).toHaveBeenCalledWith('get_leaderboard');
+        expect(mockRpc).toHaveBeenCalledWith('get_leaderboard', { filter_country: null });
     });
 
     it('maps Postgres snake_case columns to LeaderboardEntry interface', async () => {
@@ -44,6 +44,7 @@ describe('getGlobalLeaderboard (RPC-based)', () => {
                     last_place: 22,
                     total_score: 12260,
                     avg_percentile: 65,
+                    confidence_rating: 63,
                     win_rate: 17,
                     podium_rate: 59,
                 },
@@ -58,6 +59,7 @@ describe('getGlobalLeaderboard (RPC-based)', () => {
                     last_place: 27,
                     total_score: 11783,
                     avg_percentile: 60,
+                    confidence_rating: 58,
                     win_rate: 21,
                     podium_rate: 56,
                 },
@@ -80,7 +82,7 @@ describe('getGlobalLeaderboard (RPC-based)', () => {
             thirdPlace: 44,
             lastPlaceCount: 22,
             totalScore: 12260,
-            averagePercentile: 65,
+            averagePercentile: 63,
             winRate: 17,
             podiumRate: 59,
         });
@@ -118,6 +120,32 @@ describe('getGlobalLeaderboard (RPC-based)', () => {
         expect(result).toEqual([]);
     });
 
+    it('passes country_code filter to RPC when provided', async () => {
+        mockRpc.mockResolvedValue({ data: [], error: null });
+        await getGlobalLeaderboard('AE');
+        expect(mockRpc).toHaveBeenCalledWith('get_leaderboard', { filter_country: 'AE' });
+    });
+
+    it('passes null filter when no country provided', async () => {
+        mockRpc.mockResolvedValue({ data: [], error: null });
+        await getGlobalLeaderboard();
+        expect(mockRpc).toHaveBeenCalledWith('get_leaderboard', { filter_country: null });
+    });
+
+    it('maps confidence_rating to averagePercentile', async () => {
+        mockRpc.mockResolvedValue({
+            data: [{
+                email: 'test@test.com', player_name: 'Test', player_image: null,
+                games_played: 50, wins_1st: 10, second_place: 15, third_place: 5,
+                last_place: 3, total_score: 5000, avg_percentile: 65,
+                confidence_rating: 61, win_rate: 20, podium_rate: 60,
+            }],
+            error: null,
+        });
+        const result = await getGlobalLeaderboard();
+        expect(result[0].averagePercentile).toBe(61); // Maps confidence_rating, not avg_percentile
+    });
+
     it('converts numeric string values from Postgres to numbers', async () => {
         mockRpc.mockResolvedValue({
             data: [{
@@ -131,6 +159,7 @@ describe('getGlobalLeaderboard (RPC-based)', () => {
                 last_place: '3',
                 total_score: '5000',
                 avg_percentile: '72',
+                confidence_rating: '70',
                 win_rate: '20',
                 podium_rate: '60',
             }],

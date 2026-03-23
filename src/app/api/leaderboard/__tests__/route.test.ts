@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+import { NextRequest } from 'next/server';
 import { GET } from '../route';
 
 // We need to verify the module exports force-dynamic
@@ -8,32 +9,49 @@ import { GET } from '../route';
 import * as leaderboardRoute from '../route';
 
 // Mock the db module
+const mockGetGlobalLeaderboard = jest.fn(() => Promise.resolve([
+    {
+        email: 'player1@test.com',
+        name: 'Player 1',
+        image: null,
+        gamesPlayed: 5,
+        wins: 3,
+        secondPlace: 1,
+        thirdPlace: 0,
+        averagePercentile: 80,
+        podiumRate: 80,
+        winRate: 60,
+        totalScore: 500,
+        lastPlaceCount: 0,
+    }
+]));
+
 jest.mock('@/lib/db', () => ({
-    getGlobalLeaderboard: jest.fn(() => Promise.resolve([
-        {
-            email: 'player1@test.com',
-            name: 'Player 1',
-            image: null,
-            gamesPlayed: 5,
-            wins: 3,
-            secondPlace: 1,
-            thirdPlace: 0,
-            averagePercentile: 80,
-            podiumRate: 80,
-            winRate: 60,
-            totalScore: 500,
-            lastPlaceCount: 0,
-        }
-    ])),
+    getGlobalLeaderboard: (...args: any[]) => mockGetGlobalLeaderboard(...args),
 }));
 
+/** Helper to create a NextRequest with optional query params */
+function makeRequest(params?: Record<string, string>): NextRequest {
+    const url = new URL('http://localhost:3000/api/leaderboard');
+    if (params) {
+        for (const [key, value] of Object.entries(params)) {
+            url.searchParams.set(key, value);
+        }
+    }
+    return new NextRequest(url);
+}
+
 describe('/api/leaderboard route', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
     it('exports dynamic = "force-dynamic" to prevent Next.js static caching', () => {
         expect((leaderboardRoute as any).dynamic).toBe('force-dynamic');
     });
 
     it('returns cached: false on first request', async () => {
-        const response = await GET();
+        const response = await GET(makeRequest());
         const data = await response.json();
 
         expect(data.cached).toBe(false);
@@ -42,26 +60,27 @@ describe('/api/leaderboard route', () => {
     it('returns leaderboard data from the database', async () => {
         // Reset module to get fresh cache state
         jest.resetModules();
+        const mockFn = jest.fn(() => Promise.resolve([
+            {
+                email: 'player1@test.com',
+                name: 'Player 1',
+                image: null,
+                gamesPlayed: 5,
+                wins: 3,
+                secondPlace: 1,
+                thirdPlace: 0,
+                averagePercentile: 80,
+                podiumRate: 80,
+                winRate: 60,
+                totalScore: 500,
+                lastPlaceCount: 0,
+            }
+        ]));
         jest.doMock('@/lib/db', () => ({
-            getGlobalLeaderboard: jest.fn(() => Promise.resolve([
-                {
-                    email: 'player1@test.com',
-                    name: 'Player 1',
-                    image: null,
-                    gamesPlayed: 5,
-                    wins: 3,
-                    secondPlace: 1,
-                    thirdPlace: 0,
-                    averagePercentile: 80,
-                    podiumRate: 80,
-                    winRate: 60,
-                    totalScore: 500,
-                    lastPlaceCount: 0,
-                }
-            ])),
+            getGlobalLeaderboard: (...args: any[]) => mockFn(...args),
         }));
         const { GET: freshGET } = require('../route');
-        const response = await freshGET();
+        const response = await freshGET(makeRequest());
         const data = await response.json();
 
         expect(data.leaderboard).toBeDefined();
@@ -78,7 +97,7 @@ describe('/api/leaderboard route', () => {
         }));
         const { GET: errorGET } = require('../route');
 
-        const response = await errorGET();
+        const response = await errorGET(makeRequest());
         expect(response.status).toBe(500);
 
         const data = await response.json();
@@ -109,14 +128,35 @@ describe('/api/leaderboard route', () => {
         const { GET: freshGET } = require('../route');
 
         // First call — populates cache
-        const first = await freshGET();
+        const first = await freshGET(makeRequest());
         const firstData = await first.json();
         expect(firstData.cached).toBe(false);
 
         // Second call — should hit cache
-        const second = await freshGET();
+        const second = await freshGET(makeRequest());
         const secondData = await second.json();
         expect(secondData.cached).toBe(true);
         expect(typeof secondData.cacheAge).toBe('number');
+    });
+
+    it('passes country query param to getGlobalLeaderboard', async () => {
+        const response = await GET(makeRequest({ country: 'AE' }));
+        const data = await response.json();
+
+        expect(mockGetGlobalLeaderboard).toHaveBeenCalledWith('AE');
+        expect(data.cached).toBe(false);
+    });
+
+    it('passes undefined when no country param provided', async () => {
+        // Reset modules to get fresh cache
+        jest.resetModules();
+        const mockFn = jest.fn(() => Promise.resolve([]));
+        jest.doMock('@/lib/db', () => ({
+            getGlobalLeaderboard: (...args: any[]) => mockFn(...args),
+        }));
+        const { GET: freshGET } = require('../route');
+
+        await freshGET(makeRequest());
+        expect(mockFn).toHaveBeenCalledWith(undefined);
     });
 });

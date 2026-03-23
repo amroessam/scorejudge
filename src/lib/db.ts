@@ -508,13 +508,15 @@ export interface LeaderboardEntry {
     lastPlaceCount: number; // 🌈 count
 }
 
-export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
+export async function getGlobalLeaderboard(countryCode?: string): Promise<LeaderboardEntry[]> {
     // Single RPC call to Postgres function — replaces the old 5-step JS aggregation
     // that broke due to PostgREST URL length limits on .in() with 200+ game IDs.
     // The SQL function (sql/get_leaderboard.sql) runs entirely in Postgres:
     // no .limit(), no .in(), no URL constraints, single network round-trip.
 
-    const { data, error } = await supabaseAdmin.rpc('get_leaderboard');
+    const { data, error } = await supabaseAdmin.rpc('get_leaderboard', {
+        filter_country: countryCode || null,
+    });
 
     if (error) {
         log.error({ error: error.message, code: error.code }, 'Error calling get_leaderboard RPC');
@@ -537,7 +539,7 @@ export async function getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
         wins: Number(row.wins_1st),
         secondPlace: Number(row.second_place),
         thirdPlace: Number(row.third_place),
-        averagePercentile: Number(row.avg_percentile),
+        averagePercentile: Number(row.confidence_rating),
         podiumRate: Number(row.podium_rate),
         winRate: Number(row.win_rate),
         totalScore: Number(row.total_score),
