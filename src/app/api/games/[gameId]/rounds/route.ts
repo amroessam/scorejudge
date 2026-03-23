@@ -15,6 +15,7 @@ import {
 import { createLogger } from "@/lib/logger";
 import { withSpan, extractTraceContext } from "@/lib/tracing";
 import { getFinalRoundNumber } from "@/lib/game-logic";
+import { withStateRollback } from "@/lib/state-transaction";
 
 // Helper to calc round plan
 function getRoundPlan(numPlayers: number): { cards: number, trump: string }[] {
@@ -184,9 +185,22 @@ export async function POST(
                         return NextResponse.json({ error: "Dealer constraint violated" }, { status: 400 });
                     }
 
-                    await saveRoundBids(gameId, round.index, validatedBids, game.players, round.cards, round.trump);
-                    round.bids = validatedBids;
-                    round.state = 'PLAYING';
+                    // Wrap mutation + persist in rollback safety net
+                    const bidsRollbackResult = await withStateRollback(game, async (g) => {
+                        const gRound = g.rounds.find(r => r.index === g.currentRoundIndex)!;
+
+                        const saved = await saveRoundBids(gameId, gRound.index, validatedBids, g.players, gRound.cards, gRound.trump);
+                        if (!saved) return false;
+
+                        gRound.bids = validatedBids;
+                        gRound.state = 'PLAYING';
+                        return true;
+                    });
+
+                    if (bidsRollbackResult === false) {
+                        log.error('Failed to save bids - state rolled back');
+                        return NextResponse.json({ error: 'Failed to save bids' }, { status: 500 });
+                    }
                     log.info({ bids: validatedBids }, 'Bids saved successfully');
 
                 } else if (action === 'TRICKS') {
@@ -243,13 +257,11 @@ export async function POST(
                         if (bid === numTrick && numTrick !== -1) {
                             const roundPoints = bid + cardsPerPlayer;
                             points[p.email] = roundPoints;
-                            p.score += roundPoints;
                             log.info({
                                 playerEmail: p.email,
                                 bid,
                                 tricks: numTrick,
-                                pointsEarned: roundPoints,
-                                newScore: p.score
+                                pointsEarned: roundPoints
                             }, 'Player made their bid');
                         } else {
                             points[p.email] = 0;
@@ -304,36 +316,64 @@ export async function POST(
                         }, { status: 400 });
                     }
 
-                    await saveRoundTricks(gameId, round.index, validatedTricks, points, game.players);
-                    round.tricks = validatedTricks;
-                    round.state = 'COMPLETED';
+                    // Wrap mutation + persist in rollback safety net
+                    const rollbackResult = await withStateRollback(game, async (g) => {
+                        // Apply points to player scores
+                        for (const player of g.players) {
+                            if (points[player.email]) {
+                                player.score += points[player.email];
+                                log.info({
+                                    playerEmail: player.email,
+                                    pointsEarned: points[player.email],
+                                    newScore: player.score
+                                }, 'Applied score');
+                            }
+                        }
 
-                    const finalRound = getFinalRoundNumber(game.players.length);
-                    const isGameComplete = game.currentRoundIndex >= finalRound;
+                        // Persist to DB
+                        const saved = await saveRoundTricks(gameId, round.index, validatedTricks, points, g.players);
+                        if (!saved) return false;
 
-                    log.info({
-                        tricks: validatedTricks,
-                        points,
-                        currentRound: game.currentRoundIndex,
-                        finalRound,
-                        isGameComplete
-                    }, 'Tricks saved successfully');
+                        // Update round state after successful DB write
+                        const gRound = g.rounds.find(r => r.index === g.currentRoundIndex)!;
+                        gRound.tricks = validatedTricks;
+                        gRound.state = 'COMPLETED';
 
-                    if (game.currentRoundIndex < finalRound) {
-                        game.currentRoundIndex += 1;
-                        await updateDbGame(gameId, { currentRoundIndex: game.currentRoundIndex });
-                        log.info({ newRoundIndex: game.currentRoundIndex }, 'Advanced to next round');
-                    } else {
+                        // Check if game is complete and advance round
+                        const finalRound = getFinalRoundNumber(g.players.length);
+                        const isGameComplete = g.currentRoundIndex >= finalRound;
+
                         log.info({
-                            finalScores: game.players.map(p => ({
-                                name: p.name,
-                                email: p.email,
-                                score: p.score
-                            }))
-                        }, 'Game completed');
+                            tricks: validatedTricks,
+                            points,
+                            currentRound: g.currentRoundIndex,
+                            finalRound,
+                            isGameComplete
+                        }, 'Tricks saved successfully');
+
+                        if (!isGameComplete) {
+                            g.currentRoundIndex += 1;
+                            await updateDbGame(gameId, { currentRoundIndex: g.currentRoundIndex });
+                            log.info({ newRoundIndex: g.currentRoundIndex }, 'Advanced to next round');
+                        } else {
+                            log.info({
+                                finalScores: g.players.map(p => ({
+                                    name: p.name,
+                                    email: p.email,
+                                    score: p.score
+                                }))
+                            }, 'Game completed');
+                        }
+
+                        return { isGameComplete };
+                    });
+
+                    if (rollbackResult === false) {
+                        log.error('Failed to save tricks - state rolled back');
+                        return NextResponse.json({ error: 'Failed to save tricks' }, { status: 500 });
                     }
 
-                    span.setAttribute('round.isGameComplete', isGameComplete);
+                    span.setAttribute('round.isGameComplete', (rollbackResult as { isGameComplete: boolean }).isGameComplete);
 
                 } else if (action === 'UNDO') {
                     const targetIdx = targetRoundIndex || game.currentRoundIndex;

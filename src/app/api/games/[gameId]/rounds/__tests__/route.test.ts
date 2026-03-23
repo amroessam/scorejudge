@@ -19,8 +19,8 @@ jest.mock('@/lib/csrf', () => ({
 jest.mock('@/lib/db', () => ({
   getGame: jest.fn(),
   initializeRounds: jest.fn(),
-  saveRoundBids: jest.fn(),
-  saveRoundTricks: jest.fn(),
+  saveRoundBids: jest.fn().mockResolvedValue(true),
+  saveRoundTricks: jest.fn().mockResolvedValue(true),
   updateGame: jest.fn(),
 }));
 
