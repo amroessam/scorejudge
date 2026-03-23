@@ -44,8 +44,14 @@ function generatePlayers(count: number) {
 }
 
 describe('LeaderboardPage', () => {
+    const originalFetch = global.fetch;
+
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+        global.fetch = originalFetch;
     });
 
     it('renders all players without truncation (no .slice)', async () => {

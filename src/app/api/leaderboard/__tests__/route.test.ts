@@ -42,6 +42,24 @@ describe('/api/leaderboard route', () => {
     it('returns leaderboard data from the database', async () => {
         // Reset module to get fresh cache state
         jest.resetModules();
+        jest.doMock('@/lib/db', () => ({
+            getGlobalLeaderboard: jest.fn(() => Promise.resolve([
+                {
+                    email: 'player1@test.com',
+                    name: 'Player 1',
+                    image: null,
+                    gamesPlayed: 5,
+                    wins: 3,
+                    secondPlace: 1,
+                    thirdPlace: 0,
+                    averagePercentile: 80,
+                    podiumRate: 80,
+                    winRate: 60,
+                    totalScore: 500,
+                    lastPlaceCount: 0,
+                }
+            ])),
+        }));
         const { GET: freshGET } = require('../route');
         const response = await freshGET();
         const data = await response.json();
