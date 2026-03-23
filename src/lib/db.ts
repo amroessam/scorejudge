@@ -114,9 +114,9 @@ export async function updateUser(userId: string, updates: { display_name?: strin
 
 // --- Game Operations ---
 
-export async function createGame(name: string, ownerId: string) {
+export async function createGame(name: string, ownerId: string, countryCode?: string | null) {
     const startTime = Date.now();
-    log.info({ name, ownerId }, 'Creating game');
+    log.info({ name, ownerId, countryCode }, 'Creating game');
 
     const { data, error } = await supabaseAdmin
         .from('games')
@@ -124,6 +124,7 @@ export async function createGame(name: string, ownerId: string) {
             name,
             owner_id: ownerId,
             operator_id: ownerId,
+            country_code: countryCode || null,
         })
         .select()
         .single();

@@ -3,6 +3,7 @@ import { setGame, type GameState } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { createGame, getUserByEmail, upsertUser, addPlayer } from "@/lib/db";
+import { getCountryFromRequest } from "@/lib/geolocation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { validateGameName } from "@/lib/validation";
 import { getFinalRoundNumber } from "@/lib/game-logic";
@@ -180,8 +181,9 @@ export async function POST(req: NextRequest) {
 
                 span.setAttribute('user.id', user.id);
 
-                // 2. Create game in Supabase
-                const dbGame = await createGame(name, user.id);
+                // 2. Create game in Supabase (with IP-based country detection)
+                const countryCode = getCountryFromRequest(req.headers);
+                const dbGame = await createGame(name, user.id, countryCode);
                 if (!dbGame) {
                     log.error('Failed to create game in database');
                     span.setAttribute('error.type', 'game_create_failed');
