@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check as CheckIcon, AlertCircle, Loader2, Lightbulb, ChevronLeft } from "lucide-react";
 import { Player } from "@/lib/store";
-import { getFinalRoundNumber } from "@/lib/game-logic";
+import { DECK_SIZE } from "@/lib/config";
 
 interface ScoreEntryOverlayProps {
     isOpen: boolean;
@@ -12,6 +12,12 @@ interface ScoreEntryOverlayProps {
     gameId: string;
     gameState: any;
     onGameUpdate: (game: any) => void;
+}
+
+// Helper to calculate final round number
+function getFinalRoundNumber(numPlayers: number): number {
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
+    return maxCards * 2 - 1;
 }
 
 export function ScoreEntryOverlay({

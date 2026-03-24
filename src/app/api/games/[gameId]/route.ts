@@ -3,8 +3,14 @@ import { setGame, getGame, removeGame, updateGame as updateMemoryGame } from "@/
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
 import { getGame as getDbGame, updateGame as updateDbGame, deleteGame as deleteDbGame, hideGameForUser, getUserByEmail, removePlayerFromGame } from "@/lib/db";
+import { DECK_SIZE } from "@/lib/config";
 import { withSpan, extractTraceContext } from "@/lib/tracing";
-import { getFinalRoundNumber } from "@/lib/game-logic";
+
+function getFinalRoundNumber(numPlayers: number): number {
+    if (!numPlayers) return 12;
+    const maxCards = Math.floor(DECK_SIZE / numPlayers);
+    return maxCards * 2 - 1;
+}
 
 export async function GET(
     req: NextRequest,
@@ -131,8 +137,8 @@ export async function PATCH(
             const updatedGame = updateMemoryGame(gameId, { players, firstDealerEmail });
 
             // Broadcast
-            if (updatedGame) {
-                global.broadcastGameUpdate?.(gameId, updatedGame);
+            if (updatedGame && (global as any).broadcastGameUpdate) {
+                (global as any).broadcastGameUpdate(gameId, updatedGame);
             }
 
             span.setAttribute('update.success', true);
@@ -224,7 +230,9 @@ export async function DELETE(
                             memGame.players = memGame.players.filter(p => p.id !== user.id);
                             setGame(gameId, memGame);
                             // Broadcast update to other players so they see someone left
-                            global.broadcastGameUpdate?.(gameId, memGame);
+                            if ((global as any).broadcastGameUpdate) {
+                                (global as any).broadcastGameUpdate(gameId, memGame);
+                            }
                         }
 
                         return NextResponse.json({ success: true, message: "You have left the game" });

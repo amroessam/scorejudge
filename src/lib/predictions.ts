@@ -1,5 +1,4 @@
 import { Player } from "./store";
-import { getFinalRoundNumber } from "./game-logic";
 
 export interface CatchUpHint {
     targetName: string;
@@ -36,6 +35,14 @@ export interface PredictionHints {
 
     // Win condition hints
     winCondition?: WinCondition;
+}
+
+/**
+ * Helper to calculate final round number
+ */
+function getFinalRoundNumber(numPlayers: number): number {
+    const maxCards = Math.floor(52 / numPlayers);
+    return maxCards * 2 - 1;
 }
 
 /**

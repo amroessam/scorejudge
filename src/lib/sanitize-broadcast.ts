@@ -1,19 +1,15 @@
 import { GameState } from './store';
 
 /**
- * Strip PII (emails) from game state before broadcasting over WebSocket.
- * Returns a new object -- does not mutate the original.
+ * Prepare game state for broadcasting over WebSocket.
+ * Returns a shallow copy -- does not mutate the original.
  *
- * Keeps ownerEmail/operatorEmail at the top level for client auth checks.
- * Only strips email from the players array to avoid bulk PII exposure.
- *
- * MAINTENANCE: When adding new fields to the Player interface,
- * explicitly include them below or they will be silently dropped
- * from WebSocket broadcasts.
+ * NOTE: email MUST remain on players because the entire game logic
+ * (bids, tricks, scores, dealer selection) uses player.email as the
+ * primary key. Stripping it breaks all client-side game functionality.
  */
-export function sanitizeGameForBroadcast(game: GameState): Omit<GameState, 'players'> & { players: Omit<GameState['players'][number], 'email'>[] } {
+export function sanitizeGameForBroadcast(game: GameState): GameState {
     return {
         ...game,
-        players: game.players.map(({ email, ...rest }) => rest),
     };
 }

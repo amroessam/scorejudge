@@ -87,7 +87,9 @@ export async function POST(
     setGame(gameId, game);
 
     // Broadcast
-    global.broadcastGameUpdate?.(gameId, game);
+    if ((global as any).broadcastGameUpdate) {
+        (global as any).broadcastGameUpdate(gameId, game);
+    }
 
     return NextResponse.json({ success: true, game });
 }

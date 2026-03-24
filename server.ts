@@ -10,7 +10,6 @@ import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { getGame, type GameState } from './src/lib/store';
-import { sanitizeGameForBroadcast } from './src/lib/sanitize-broadcast';
 import { getGame as getDbGame, purgeStaleGames } from './src/lib/db';
 import { getToken } from 'next-auth/jwt';
 import { IncomingMessage } from 'http';
@@ -179,21 +178,6 @@ app.prepare().then(async () => {
     const discoveryClients = new Set<WebSocket>(); // Clients listening for discovery updates
 
     wss.on('connection', async (ws, req) => {
-        // Heartbeat: detect stale connections
-        let isAlive = true;
-
-        ws.on('pong', () => { isAlive = true; });
-
-        const pingTimer = setInterval(() => {
-            if (!isAlive) {
-                clearInterval(pingTimer);
-                ws.terminate();
-                return;
-            }
-            isAlive = false;
-            ws.ping();
-        }, 30_000); // Ping every 30 seconds
-
         const { query } = parse(req.url || '', true);
         const gameId = query.gameId as string;
         const channel = query.channel as string; // 'discovery' for discovery channel
@@ -218,7 +202,6 @@ app.prepare().then(async () => {
             span.end();
 
             ws.on('close', () => {
-                clearInterval(pingTimer);
                 discoveryClients.delete(ws);
             });
 
@@ -257,7 +240,7 @@ app.prepare().then(async () => {
         if (state) {
             span.setAttribute('game.found', true);
             span.setAttribute('game.name', state.name);
-            ws.send(JSON.stringify({ type: 'GAME_UPDATE', state: sanitizeGameForBroadcast(state) }));
+            ws.send(JSON.stringify({ type: 'GAME_UPDATE', state }));
         } else {
             span.setAttribute('game.found', false);
             ws.send(JSON.stringify({ type: 'ERROR', message: 'Game not loaded in memory. Visit page to load.' }));
@@ -271,7 +254,6 @@ app.prepare().then(async () => {
         });
 
         ws.on('close', () => {
-            clearInterval(pingTimer);
             clients.delete(ws);
         });
     });
@@ -280,10 +262,9 @@ app.prepare().then(async () => {
     // We can expose a global broadcast function or use an event emitter.
     // Since `server.ts` is the entry point, we can attach to `global`
 
-    global.broadcastGameUpdate = (gameId: string, state: GameState) => {
+    (global as any).broadcastGameUpdate = (gameId: string, state: GameState) => {
         let latestState = getGame(gameId) || state;
-        const sanitized = sanitizeGameForBroadcast(latestState);
-        const message = JSON.stringify({ type: 'GAME_UPDATE', state: sanitized });
+        const message = JSON.stringify({ type: 'GAME_UPDATE', state: latestState });
         let sentCount = 0;
 
         console.log(`[Broadcast] Broadcasting update for gameId=${gameId}, connectedClients=${clients.size}`);
@@ -303,14 +284,14 @@ app.prepare().then(async () => {
     };
 
     // Broadcast discovery updates (new games, game updates that affect discoverability)
-    global.broadcastDiscoveryUpdate = (updateType: 'GAME_CREATED' | 'GAME_UPDATED' | 'GAME_DELETED', game: GameState) => {
+    (global as any).broadcastDiscoveryUpdate = (updateType: 'GAME_CREATED' | 'GAME_UPDATED' | 'GAME_DELETED', game: GameState) => {
         const message = JSON.stringify({
             type: 'DISCOVERY_UPDATE',
             updateType,
             game: {
                 id: game.id,
                 name: game.name,
-                ownerName: game.players?.find(p => p.email === game.ownerEmail)?.name || 'Unknown',
+                ownerEmail: game.ownerEmail,
                 playerCount: game.players?.length || 0,
                 currentRoundIndex: game.currentRoundIndex,
             }
