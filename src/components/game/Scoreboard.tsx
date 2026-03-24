@@ -19,6 +19,7 @@ import {
 import { Player } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { PlayerHistoryOverlay } from "./PlayerHistoryOverlay";
+import { RoundPickerOverlay } from "./RoundPickerOverlay";
 import { PredictionHint } from "./PredictionHint";
 import { DECK_SIZE } from "@/lib/config";
 import { ShareableScorecard } from "@/components/sharing/ShareableScorecard";
@@ -34,6 +35,7 @@ interface ScoreboardProps {
     currentUserEmail?: string;
     onOpenEntry: () => void;
     onUndo: () => void;
+    onRewind?: (roundIndex: number) => void;
     onOpenSettings: () => void;
     onNextRound?: () => void;
 }
@@ -96,11 +98,13 @@ export function Scoreboard({
     currentUserEmail,
     onOpenEntry,
     onUndo,
+    onRewind,
     onOpenSettings,
     onNextRound
 }: ScoreboardProps) {
     const router = useRouter();
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+    const [showRoundPicker, setShowRoundPicker] = useState(false);
     const [isSharing, setIsSharing] = useState(false);
     const [showLastPlayerMessage, setShowLastPlayerMessage] = useState(true);
     const { players, currentRoundIndex, rounds, firstDealerEmail, name: gameName } = gameState;
@@ -597,10 +601,10 @@ export function Scoreboard({
             <div className="bg-[var(--background)]/90 backdrop-blur-md border-t border-[var(--border)] safe-pb">
                 <div className="px-4 pb-4 pt-4">
                     <div className="flex items-center gap-4 max-w-md mx-auto">
-                        {/* Secondary Actions - Only show undo for host, and only if game not ended */}
-                        {isOwner && !isGameEnded && (
+                        {/* Undo button — always opens round picker */}
+                        {isOwner && (
                             <button
-                                onClick={onUndo}
+                                onClick={() => setShowRoundPicker(true)}
                                 className="p-3 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] active:scale-95 transition-transform touch-manipulation"
                             >
                                 <Undo2 size={24} />
@@ -678,6 +682,23 @@ export function Scoreboard({
                 onClose={() => setSelectedPlayer(null)}
                 player={selectedPlayer}
                 rounds={rounds}
+            />
+
+            <RoundPickerOverlay
+                isOpen={showRoundPicker}
+                onClose={() => setShowRoundPicker(false)}
+                onUndo={() => {
+                    onUndo();
+                    setShowRoundPicker(false);
+                }}
+                onRewind={(roundIndex) => {
+                    onRewind?.(roundIndex);
+                    setShowRoundPicker(false);
+                }}
+                rounds={rounds}
+                players={players}
+                currentRoundIndex={currentRoundIndex}
+                isGameEnded={isGameEnded}
             />
 
             {/* Hidden Scorecard for Capture */}

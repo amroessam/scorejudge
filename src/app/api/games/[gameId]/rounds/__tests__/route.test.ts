@@ -500,5 +500,194 @@ describe('/api/games/[gameId]/rounds', () => {
       expect(data.error).toContain('Invalid distribution');
     });
   });
+
+  describe('REWIND action', () => {
+    const setupAuthAsOwner = () => {
+      (getAuthToken as jest.Mock).mockResolvedValue({
+        id: 'player1',
+        name: 'Player One',
+        email: 'player1@test.com',
+      });
+    };
+
+    const createGameWithCompletedRounds = (numCompletedRounds: number) => {
+      const rounds = [];
+      for (let i = 1; i <= numCompletedRounds + 1; i++) {
+        const isCompleted = i <= numCompletedRounds;
+        rounds.push({
+          index: i,
+          cards: 3,
+          trump: ['S', 'D', 'C'][i % 3],
+          state: isCompleted ? 'COMPLETED' as const : 'BIDDING' as const,
+          bids: isCompleted ? {
+            'player1@test.com': 1,
+            'player2@test.com': 1,
+            'player3@test.com': 0,
+          } : {},
+          tricks: isCompleted ? {
+            'player1@test.com': 1,
+            'player2@test.com': 1,
+            'player3@test.com': -1, // Missed — took remaining trick(s)
+          } : {},
+        });
+      }
+
+      // Scores: 3 cards, bid 1 got 1 → points = 1+3 = 4
+      // p1 & p2 made every round, p3 missed (bid 0, marked -1)
+      const gameState = createGameState(3, {
+        currentRoundIndex: numCompletedRounds + 1,
+        rounds,
+        players: [
+          createMockPlayer({ id: 'player1', email: 'player1@test.com', name: 'Player 1', score: numCompletedRounds * 4, playerOrder: 0 }),
+          createMockPlayer({ id: 'player2', email: 'player2@test.com', name: 'Player 2', score: numCompletedRounds * 4, playerOrder: 1 }),
+          createMockPlayer({ id: 'player3', email: 'player3@test.com', name: 'Player 3', score: 0, playerOrder: 2 }),
+        ],
+      });
+
+      setGame('game1', gameState);
+      return gameState;
+    };
+
+    it('should rewind a completed round to PLAYING state', async () => {
+      setupAuthAsOwner();
+      createGameWithCompletedRounds(3);
+
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REWIND', targetRoundIndex: 2 }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+
+      // Target round should be PLAYING with bids preserved and tricks cleared
+      const rewoundRound = data.game.rounds.find((r: any) => r.index === 2);
+      expect(rewoundRound.state).toBe('PLAYING');
+      expect(rewoundRound.bids).toEqual({
+        'player1@test.com': 1,
+        'player2@test.com': 1,
+        'player3@test.com': 0,
+      });
+      expect(rewoundRound.tricks).toEqual({});
+
+      // currentRoundIndex should be set to the target
+      expect(data.game.currentRoundIndex).toBe(2);
+    });
+
+    it('should recalculate all scores correctly after rewind', async () => {
+      setupAuthAsOwner();
+      createGameWithCompletedRounds(3);
+
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REWIND', targetRoundIndex: 2 }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      // After rewinding round 2, only round 1 is COMPLETED
+      // Round 1: player1 bid 1 got 1 → 4 pts, player2 bid 1 got 1 → 4 pts, player3 bid 0 got 1 → 0 pts
+      // Round 2 is now PLAYING (not counted), Round 3 still COMPLETED but shouldn't count
+      // because recalculate only counts COMPLETED rounds and round 2 is now PLAYING
+      // Actually round 3 is still COMPLETED so its score counts
+      // Score = round1 (4) + round3 (4) = 8 for player1 and player2
+      const p1 = data.game.players.find((p: any) => p.email === 'player1@test.com');
+      const p2 = data.game.players.find((p: any) => p.email === 'player2@test.com');
+      const p3 = data.game.players.find((p: any) => p.email === 'player3@test.com');
+
+      // Rounds 1 and 3 are still COMPLETED, round 2 is PLAYING
+      expect(p1.score).toBe(8); // 4 + 4
+      expect(p2.score).toBe(8); // 4 + 4
+      expect(p3.score).toBe(0); // 0 + 0
+    });
+
+    it('should reject REWIND for non-COMPLETED round', async () => {
+      setupAuthAsOwner();
+      createGameWithCompletedRounds(3);
+
+      // Try to rewind round 4 which is BIDDING (not completed)
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REWIND', targetRoundIndex: 4 }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('can only rewind COMPLETED rounds');
+    });
+
+    it('should reject REWIND without targetRoundIndex', async () => {
+      setupAuthAsOwner();
+      createGameWithCompletedRounds(3);
+
+      const req = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REWIND' }),
+      });
+
+      const response = await POST(req, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('targetRoundIndex is required');
+    });
+
+    it('should auto-advance through subsequent completed rounds after fixing tricks', async () => {
+      setupAuthAsOwner();
+      createGameWithCompletedRounds(3);
+
+      // First rewind to round 2
+      const rewindReq = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REWIND', targetRoundIndex: 2 }),
+      });
+
+      await POST(rewindReq, { params: Promise.resolve({ gameId: 'game1' }) });
+
+      // Now submit corrected tricks for round 2
+      // Valid distribution: p1 bid 1 got 1, p2 bid 1 got 1, p3 bid 0 missed (got some tricks)
+      const tricksReq = new NextRequest('http://localhost:3000/api/games/game1/rounds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TRICKS',
+          inputs: {
+            'player1@test.com': 1,
+            'player2@test.com': 1,
+            'player3@test.com': -1, // Missed — took remaining 1 trick
+          },
+        }),
+      });
+
+      const response = await POST(tricksReq, { params: Promise.resolve({ gameId: 'game1' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+
+      // Round 2 should now be COMPLETED again
+      const round2 = data.game.rounds.find((r: any) => r.index === 2);
+      expect(round2.state).toBe('COMPLETED');
+
+      // Auto-advance should have detected round 3 has bids+tricks and re-scored it
+      // With DECK_SIZE=6 and 3 players, finalRound=3, so game is now complete
+      // currentRoundIndex stays at 3 (the last round)
+      expect(data.game.currentRoundIndex).toBe(3);
+
+      // All scores recalculated: 3 rounds × 4 pts each for p1 and p2
+      const p1 = data.game.players.find((p: any) => p.email === 'player1@test.com');
+      expect(p1.score).toBe(12); // 3 × 4
+    });
+  });
 });
 

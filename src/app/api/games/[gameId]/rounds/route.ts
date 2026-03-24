@@ -37,6 +37,27 @@ function getDealerIndex(roundIndex: number, numPlayers: number): number {
 }
 
 /**
+ * Recalculates all cumulative player scores from scratch by walking every COMPLETED round.
+ * Deterministic: resets all scores to 0, then applies scoring formula per round.
+ * Same formula as TRICKS handler: bid === tricks (and !== -1) → points = bid + cards
+ */
+function recalculateAllScores(game: GameState): void {
+    for (const p of game.players) p.score = 0;
+
+    for (const round of [...game.rounds].sort((a, b) => a.index - b.index)) {
+        if (round.state !== 'COMPLETED') continue;
+        for (const p of game.players) {
+            const bid = round.bids[p.email];
+            const tricks = round.tricks[p.email];
+            if (bid !== undefined && tricks !== undefined
+                && tricks !== -1 && bid === tricks) {
+                p.score += bid + round.cards;
+            }
+        }
+    }
+}
+
+/**
  * Deep Validation: Checks if there exists ANY distribution of tricks across missed players
  * such that the total sum matches requiredTricks AND no missed player takes exactly their bid.
  */
@@ -327,6 +348,29 @@ export async function POST(
                         game.currentRoundIndex += 1;
                         await updateDbGame(gameId, { currentRoundIndex: game.currentRoundIndex });
                         log.info({ newRoundIndex: game.currentRoundIndex }, 'Advanced to next round');
+
+                        // Auto-advance: if subsequent rounds already have bids+tricks data
+                        // (from a REWIND scenario), auto-complete them without re-entry
+                        let nextRound = game.rounds.find(r => r.index === game.currentRoundIndex);
+                        while (nextRound && nextRound.state === 'COMPLETED'
+                            && Object.keys(nextRound.bids).length === game.players.length
+                            && Object.keys(nextRound.tricks).length === game.players.length
+                            && game.currentRoundIndex <= finalRound) {
+
+                            log.info({ roundIndex: nextRound.index }, 'Auto-advancing through previously completed round');
+
+                            if (game.currentRoundIndex < finalRound) {
+                                game.currentRoundIndex += 1;
+                            } else {
+                                break;
+                            }
+                            nextRound = game.rounds.find(r => r.index === game.currentRoundIndex);
+                        }
+
+                        // Recalculate all scores from scratch to ensure correctness
+                        recalculateAllScores(game);
+                        await saveGamePlayerScores(gameId, game.players);
+                        await updateDbGame(gameId, { currentRoundIndex: game.currentRoundIndex });
                     } else {
                         log.info({
                             finalScores: game.players.map(p => ({
@@ -414,6 +458,46 @@ export async function POST(
                     }
 
                     span.setAttribute('round.undoFrom', initialState);
+
+                } else if (action === 'REWIND') {
+                    if (!targetRoundIndex) {
+                        return NextResponse.json({ error: "targetRoundIndex is required for REWIND" }, { status: 400 });
+                    }
+
+                    const round = game.rounds.find(r => r.index === targetRoundIndex);
+                    if (!round) {
+                        return NextResponse.json({ error: "Round not found" }, { status: 404 });
+                    }
+                    if (round.state !== 'COMPLETED') {
+                        return NextResponse.json({ error: "You can only rewind COMPLETED rounds" }, { status: 400 });
+                    }
+
+                    log.info({ targetRoundIndex, currentRoundIndex: game.currentRoundIndex }, 'Rewinding to previous round');
+
+                    // Set target round to PLAYING (keep bids, clear tricks)
+                    round.state = 'PLAYING';
+                    round.tricks = {};
+
+                    // Move currentRoundIndex back to the target
+                    game.currentRoundIndex = targetRoundIndex;
+
+                    // Recalculate all scores from scratch (only COMPLETED rounds count)
+                    recalculateAllScores(game);
+
+                    // Persist changes to database
+                    await supabaseAdmin
+                        .from('rounds')
+                        .update({ state: 'PLAYING' })
+                        .eq('game_id', gameId)
+                        .eq('round_index', targetRoundIndex);
+
+                    await saveGamePlayerScores(gameId, game.players);
+                    await updateDbGame(gameId, { currentRoundIndex: targetRoundIndex });
+
+                    log.info({
+                        targetRoundIndex,
+                        playerScores: game.players.map(p => ({ email: p.email, score: p.score }))
+                    }, 'Rewind complete, scores recalculated');
                 }
 
                 setGame(gameId, game);

@@ -335,6 +335,27 @@ export default function GamePage() {
         }
     };
 
+    const handleRewind = async (targetRoundIndex: number) => {
+        if (!gameState) return;
+
+        try {
+            const res = await fetch(`/api/games/${gameId}/rounds`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'REWIND', targetRoundIndex })
+            });
+            const data = await res.json();
+            if (res.ok && data.game) {
+                setGameState(data.game);
+            } else {
+                alert(data.error || 'Failed to rewind');
+            }
+        } catch (e) {
+            console.error("Failed to rewind:", e);
+            alert("Failed to rewind. Please try again.");
+        }
+    };
+
     const handleNextRound = async () => {
         // Check if game has ended before trying to start next round
         if (gameState) {
@@ -423,13 +444,14 @@ export default function GamePage() {
                 />
             ) : (
                 <>
-                    <Scoreboard 
-                        gameId={gameId} 
-                        gameState={gameState} 
-                        isOwner={isOwner} 
+                    <Scoreboard
+                        gameId={gameId}
+                        gameState={gameState}
+                        isOwner={isOwner}
                         currentUserEmail={session?.user?.email || undefined}
                         onOpenEntry={() => setShowEntry(true)}
                         onUndo={handleUndo}
+                        onRewind={handleRewind}
                         onOpenSettings={() => setShowSettings(true)}
                         onNextRound={handleNextRound}
                     />
