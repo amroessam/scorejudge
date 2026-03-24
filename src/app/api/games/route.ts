@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { setGame, type GameState } from "@/lib/store";
 import { validateCSRF } from "@/lib/csrf";
 import { getAuthToken } from "@/lib/auth-utils";
-import { createGame, getUserByEmail, upsertUser, addPlayer } from "@/lib/db";
+import { createGame, getUserByEmail, upsertUser } from "@/lib/db";
 import { getCountryFromRequest } from "@/lib/geolocation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { validateGameName } from "@/lib/validation";
@@ -200,11 +200,8 @@ export async function POST(req: NextRequest) {
                     gameName: name
                 });
 
-                // 3. Add host as the first player in the database
-                gameLog.info('Adding creator as first player');
-                await addPlayer(gameId, user.id, 0);
-
                 // 3. Initialize game state in memory for immediate access
+                // Note: createGame() already adds the owner as first player internally
                 const now = Date.now();
                 const initialGameState: GameState = {
                     id: gameId,

@@ -77,6 +77,19 @@ describe('db.ts (Supabase Data Access Layer)', () => {
             expect(supabaseAdmin.from).toHaveBeenCalledWith('games');
             expect(game?.id).toBe('game-1');
         });
+
+        it('should add owner as first player internally (no external addPlayer needed)', async () => {
+            const game = await createGame('My Game', 'user-1');
+
+            // createGame internally calls addPlayer, which calls supabaseAdmin.from('game_players')
+            const fromCalls = (supabaseAdmin.from as jest.Mock).mock.calls.map((c: any[]) => c[0]);
+            expect(fromCalls).toContain('games');
+            expect(fromCalls).toContain('game_players');
+
+            // Verify it was called exactly once for game_players (not twice)
+            const gamePlayerCalls = fromCalls.filter((c: string) => c === 'game_players');
+            expect(gamePlayerCalls).toHaveLength(1);
+        });
     });
 
     describe('addPlayer', () => {

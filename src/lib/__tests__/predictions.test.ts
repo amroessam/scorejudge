@@ -91,10 +91,10 @@ describe('calculatePredictions', () => {
             createPlayer('P6', 'p6@test.com', 25),
         ];
 
-        it('P4 (1st) should have victory secured (no remaining rounds with DECK_SIZE)', () => {
+        it('P4 (1st) should be safe in 1st (lead not yet mathematically unbeatable)', () => {
             const hints = calculatePredictions('p4@test.com', players, 6, 3, 6, false);
             expect(hints.position).toBe(1);
-            expect(hints.winCondition?.message).toContain('Victory secured');
+            expect(hints.winCondition?.message).toContain('Safe in 1st');
         });
 
         it('P3 (4th) should need 3+ if P1 misses', () => {
